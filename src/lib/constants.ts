@@ -21,3 +21,21 @@ export const DIAS_SEMANA = [
 export const DISPONIBILIDADE_PADRAO_DIAS = [1, 2, 3, 4, 5];
 export const DISPONIBILIDADE_PADRAO_INICIO = "09:00";
 export const DISPONIBILIDADE_PADRAO_FIM = "18:00";
+
+export const OPCOES_ANTECEDENCIA = [
+  { valor: 0, label: "Sem antecedência mínima" },
+  { valor: 30, label: "30 minutos" },
+  { valor: 60, label: "1 hora" },
+  { valor: 120, label: "2 horas" },
+  { valor: 240, label: "4 horas" },
+  { valor: 1440, label: "1 dia" },
+] as const;
+
+export const CORES_SERVICO = [
+  { valor: "#7C3AED", label: "Roxo" },
+  { valor: "#FB7185", label: "Coral" },
+  { valor: "#10B981", label: "Verde" },
+  { valor: "#F59E0B", label: "Âmbar" },
+  { valor: "#0EA5E9", label: "Azul" },
+  { valor: "#EC4899", label: "Rosa" },
+] as const;

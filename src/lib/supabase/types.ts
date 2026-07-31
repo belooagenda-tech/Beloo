@@ -162,6 +162,10 @@ export type Database = {
         Args: { candidate_slug: string };
         Returns: boolean;
       };
+      replace_business_hours: {
+        Args: { p_business_id: string; p_hours: { dia_semana: number; hora_inicio: string; hora_fim: string }[] };
+        Returns: undefined;
+      };
     };
   };
 };

@@ -10,6 +10,7 @@ import {
   DISPONIBILIDADE_PADRAO_DIAS,
   DISPONIBILIDADE_PADRAO_FIM,
   DISPONIBILIDADE_PADRAO_INICIO,
+  OPCOES_ANTECEDENCIA,
 } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,15 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const OPCOES_ANTECEDENCIA = [
-  { valor: 0, label: "Sem antecedência mínima" },
-  { valor: 30, label: "30 minutos" },
-  { valor: 60, label: "1 hora" },
-  { valor: 120, label: "2 horas" },
-  { valor: 240, label: "4 horas" },
-  { valor: 1440, label: "1 dia" },
-];
 
 export function AvailabilityStep({
   onSubmit,
