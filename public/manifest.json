@@ -1,0 +1,19 @@
+{
+  "name": "Beloo — Agenda online",
+  "short_name": "Beloo",
+  "description": "Configure sua agenda, compartilhe seu link e receba agendamentos.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FAFAFA",
+  "theme_color": "#7C3AED",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
