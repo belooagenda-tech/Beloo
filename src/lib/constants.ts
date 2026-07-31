@@ -31,6 +31,22 @@ export const OPCOES_ANTECEDENCIA = [
   { valor: 1440, label: "1 dia" },
 ] as const;
 
+// Precisa ficar em sincronia com a checagem em is_slug_available() /
+// slug_not_reserved (supabase/migrations/20260731000006_reserved_slugs.sql).
+export const SLUGS_RESERVADOS = [
+  "entrar",
+  "criar-agenda",
+  "app",
+  "api",
+  "icon.svg",
+  "manifest.json",
+  "favicon.ico",
+  "sw.js",
+  "robots.txt",
+  "sitemap.xml",
+  "_next",
+] as const;
+
 export const CORES_SERVICO = [
   { valor: "#7C3AED", label: "Roxo" },
   { valor: "#FB7185", label: "Coral" },
