@@ -105,6 +105,20 @@ export type Appointment = {
   status: AppointmentStatus;
   observacoes: string | null;
   created_at: string;
+  client_reminder_sent_at: string | null;
+};
+
+export type NotificationTipo = "novo_agendamento" | "cancelamento" | "lembrete_dia";
+
+export type Notification = {
+  id: string;
+  profile_id: string;
+  tipo: NotificationTipo;
+  titulo: string;
+  corpo: string | null;
+  appointment_id: string | null;
+  lida: boolean;
+  created_at: string;
 };
 
 export type AppointmentPayment = {
@@ -155,6 +169,7 @@ export type Database = {
       appointment_payments: Table<AppointmentPayment>;
       push_subscriptions: Table<PushSubscriptionRow>;
       saas_plans: Table<SaasPlan>;
+      notifications: Table<Notification>;
     };
     Views: Record<string, never>;
     Functions: {

@@ -1,14 +1,18 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { LogoMark } from "@/components/brand/logo";
+import type { Notification } from "@/lib/supabase/types";
 import { AppSidebarNav } from "./app-sidebar-nav";
 import { SignOutButton } from "./sign-out-button";
+import { NotificationBell } from "./notification-bell";
 
 export function AppShell({
   nomeLoja,
+  notifications,
   children,
 }: {
   nomeLoja: string;
+  notifications: Notification[];
   children: ReactNode;
 }) {
   return (
@@ -20,7 +24,10 @@ export function AppShell({
             {nomeLoja}
           </span>
         </Link>
-        <SignOutButton />
+        <div className="flex items-center gap-1">
+          <NotificationBell initialNotifications={notifications} />
+          <SignOutButton />
+        </div>
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <AppSidebarNav />

@@ -23,5 +23,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     redirect("/criar-agenda");
   }
 
-  return <AppShell nomeLoja={business.nome_loja}>{children}</AppShell>;
+  const { data: notifications } = await supabase
+    .from("notifications")
+    .select("id, profile_id, tipo, titulo, corpo, appointment_id, lida, created_at")
+    .eq("profile_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  return (
+    <AppShell nomeLoja={business.nome_loja} notifications={notifications ?? []}>
+      {children}
+    </AppShell>
+  );
 }

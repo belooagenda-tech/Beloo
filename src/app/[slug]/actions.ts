@@ -1,10 +1,12 @@
 "use server";
 
 import { addMinutes } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAvailableSlotsForService } from "@/lib/booking/get-available-slots";
 import { normalizePhone } from "@/lib/phone";
 import { clientInfoSchema } from "@/lib/validations/public-booking";
+import { notifyProfessional } from "@/lib/push/notify";
 
 export async function getAvailableSlotsAction(
   slug: string,
@@ -43,14 +45,14 @@ export async function createAppointmentAction(input: {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id")
+    .select("id, profile_id, timezone")
     .eq("slug", input.slug)
     .maybeSingle();
   if (!business) return { ok: false, error: "Loja não encontrada." };
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, duracao_min, ativo")
+    .select("id, nome, duracao_min, ativo")
     .eq("id", input.serviceId)
     .eq("business_id", business.id)
     .maybeSingle();
@@ -72,12 +74,13 @@ export async function createAppointmentAction(input: {
 
   const { data: existingClient } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, nome")
     .eq("business_id", business.id)
     .eq("telefone", telefoneNormalizado)
     .maybeSingle();
 
   let clientId = existingClient?.id;
+  const clientNome = existingClient?.nome ?? parsed.data.nome;
 
   if (!clientId) {
     const { data: newClient, error: clientError } = await supabase
@@ -112,6 +115,21 @@ export async function createAppointmentAction(input: {
           ? "Esse horário acabou de ser preenchido por outro cliente. Escolha outro horário."
           : "Não foi possível concluir o agendamento. Tente novamente.",
     };
+  }
+
+  const horario = formatInTimeZone(inicio, business.timezone, "dd/MM 'às' HH:mm");
+  try {
+    await notifyProfessional(supabase, {
+      profileId: business.profile_id,
+      tipo: "novo_agendamento",
+      titulo: "Novo agendamento",
+      corpo: `${clientNome} agendou ${service.nome} para ${horario}.`,
+      appointmentId: appointment.id,
+      url: "/app/agenda",
+    });
+  } catch {
+    // O agendamento já foi criado com sucesso; falha ao notificar não pode
+    // derrubar a resposta para o cliente.
   }
 
   return { ok: true, appointmentId: appointment.id };

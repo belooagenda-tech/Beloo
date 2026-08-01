@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Poppins, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -23,6 +24,9 @@ export const metadata: Metadata = {
   description:
     "Configure sua agenda, compartilhe seu link e receba agendamentos. O jeito simples de organizar seu dia a dia.",
   manifest: "/manifest.json",
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -44,6 +48,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <Toaster position="top-center" />
+          <RegisterServiceWorker />
         </ThemeProvider>
       </body>
     </html>
