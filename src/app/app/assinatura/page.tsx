@@ -26,6 +26,7 @@ export default function AssinaturaPage() {
           </p>
           <Button
             className="mt-2"
+            nativeButton={false}
             render={
               <a href={WHATSAPP_URL} target="_blank" rel="noreferrer">
                 Falar no WhatsApp

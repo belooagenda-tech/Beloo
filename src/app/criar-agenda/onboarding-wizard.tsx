@@ -206,6 +206,7 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
         <Button
           variant="outline"
           className="w-full"
+          nativeButton={false}
           render={<Link href="/entrar">Já confirmei, ir para o login</Link>}
         />
       </div>

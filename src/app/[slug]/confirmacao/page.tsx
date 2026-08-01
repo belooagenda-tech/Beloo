@@ -81,6 +81,7 @@ export default async function ConfirmacaoPage({
               </p>
               <Button
                 className="mt-2 w-full"
+                nativeButton={false}
                 render={<Link href={`/${slug}`}>Fazer outro agendamento</Link>}
               />
             </CardContent>
