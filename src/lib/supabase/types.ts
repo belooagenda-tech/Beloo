@@ -166,6 +166,15 @@ export type Database = {
         Args: { p_business_id: string; p_hours: { dia_semana: number; hora_inicio: string; hora_fim: string }[] };
         Returns: undefined;
       };
+      complete_appointment_payment: {
+        Args: {
+          p_appointment_id: string;
+          p_valor: number;
+          p_forma_pagamento: string;
+          p_origem: string;
+        };
+        Returns: { payment_id: string; credito_descontado: boolean }[];
+      };
     };
   };
 };
