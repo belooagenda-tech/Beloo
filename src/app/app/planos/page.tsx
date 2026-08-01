@@ -1,15 +1,46 @@
 import type { Metadata } from "next";
-import { Repeat } from "lucide-react";
-import { ComingSoon } from "@/components/app-shell/coming-soon";
+import { createClient } from "@/lib/supabase/server";
+import { PlansManager } from "./plans-manager";
 
 export const metadata: Metadata = { title: "Planos" };
 
-export default function PlanosPage() {
+export default async function PlanosPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("profile_id", user!.id)
+    .single();
+
+  const [{ data: services }, { data: plans }] = await Promise.all([
+    supabase
+      .from("services")
+      .select("id, nome")
+      .eq("business_id", business!.id)
+      .eq("ativo", true)
+      .order("nome", { ascending: true }),
+    supabase
+      .from("client_plans")
+      .select("id, nome, valor_mensal, servicos_inclusos, ciclo_dias, ativo")
+      .eq("business_id", business!.id)
+      .order("created_at", { ascending: true }),
+  ]);
+
   return (
-    <ComingSoon
-      icon={Repeat}
-      title="Planos para seus clientes chegam em breve"
-      description="Crie pacotes recorrentes, como 'Unha em Dia — R$140/mês', para vender aos seus clientes."
-    />
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <h1 className="font-heading text-2xl font-semibold text-foreground">Planos</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pacotes recorrentes que você vende para os seus clientes — não
+          confunda com a sua assinatura da Beloo, que fica em Assinatura.
+        </p>
+      </div>
+
+      <PlansManager businessId={business!.id} services={services ?? []} initialPlans={plans ?? []} />
+    </div>
   );
 }

@@ -9,8 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { formatPhoneBR } from "@/lib/phone";
 import type { AppointmentStatus } from "@/lib/supabase/types";
 import { EditClientDialog } from "./edit-client-dialog";
+import { AssignPlanDialog } from "./assign-plan-dialog";
+import { PlanActions } from "./plan-actions";
 import type {
   ActivePlan,
+  AvailablePlan,
   ClientDetail,
   HistoryAppointment,
   HistoryPayment,
@@ -42,6 +45,7 @@ export function ClientProfile({
   appointments,
   payments,
   activePlan,
+  availablePlans,
   totalGastoAvulso,
   totalVisitas,
   ultimaVisita,
@@ -52,6 +56,7 @@ export function ClientProfile({
   appointments: HistoryAppointment[];
   payments: HistoryPayment[];
   activePlan: ActivePlan | null;
+  availablePlans: AvailablePlan[];
   totalGastoAvulso: number;
   totalVisitas: number;
   ultimaVisita: string | null;
@@ -119,7 +124,7 @@ export function ClientProfile({
           <CardHeader>
             <CardTitle className="text-base">Plano ativo: {activePlan.planNome}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Renova em {formatarData(activePlan.dataRenovacao)}
             </p>
@@ -136,9 +141,17 @@ export function ClientProfile({
                 </li>
               ))}
             </ul>
+            <PlanActions plan={activePlan} />
           </CardContent>
         </Card>
-      ) : null}
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <p className="text-sm text-muted-foreground">Este cliente não tem plano ativo.</p>
+            <AssignPlanDialog clientId={client.id} availablePlans={availablePlans} />
+          </CardContent>
+        </Card>
+      )}
 
       <div>
         <h2 className="mb-2 font-heading text-lg font-semibold text-foreground">

@@ -32,3 +32,10 @@ export type ActivePlan = {
   cicloDias: number;
   itens: { serviceId: string; serviceNome: string; usados: number; limite: number | null }[];
 };
+
+export type AvailablePlan = {
+  id: string;
+  nome: string;
+  valor_mensal: number;
+  ciclo_dias: number;
+};

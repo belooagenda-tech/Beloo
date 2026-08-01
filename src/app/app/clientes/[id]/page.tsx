@@ -41,20 +41,27 @@ export default async function ClientDetailPage({
 
   if (!client) notFound();
 
-  const [{ data: services }, { data: appointments }, { data: sub }] = await Promise.all([
-    supabase.from("services").select("id, nome").eq("business_id", business!.id),
-    supabase
-      .from("appointments")
-      .select("id, service_id, inicio, fim, status")
-      .eq("client_id", client.id)
-      .order("inicio", { ascending: false }),
-    supabase
-      .from("client_plan_subs")
-      .select("id, plan_id, data_renovacao, creditos_usados")
-      .eq("client_id", client.id)
-      .eq("ativo", true)
-      .maybeSingle(),
-  ]);
+  const [{ data: services }, { data: appointments }, { data: sub }, { data: availablePlans }] =
+    await Promise.all([
+      supabase.from("services").select("id, nome").eq("business_id", business!.id),
+      supabase
+        .from("appointments")
+        .select("id, service_id, inicio, fim, status")
+        .eq("client_id", client.id)
+        .order("inicio", { ascending: false }),
+      supabase
+        .from("client_plan_subs")
+        .select("id, plan_id, data_renovacao, creditos_usados")
+        .eq("client_id", client.id)
+        .eq("ativo", true)
+        .maybeSingle(),
+      supabase
+        .from("client_plans")
+        .select("id, nome, valor_mensal, ciclo_dias")
+        .eq("business_id", business!.id)
+        .eq("ativo", true)
+        .order("nome", { ascending: true }),
+    ]);
 
   const appointmentIds = (appointments ?? []).map((a) => a.id);
   const { data: payments } =
@@ -105,6 +112,7 @@ export default async function ClientDetailPage({
       appointments={appointments ?? []}
       payments={payments ?? []}
       activePlan={activePlan}
+      availablePlans={availablePlans ?? []}
       totalGastoAvulso={totalGastoAvulso}
       totalVisitas={totalVisitas}
       ultimaVisita={ultimaVisita}
