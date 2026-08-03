@@ -7,6 +7,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Logo } from "@/components/brand/logo";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ClientPushOptIn } from "@/components/client-push-opt-in";
+import { subscribeClientPushByAppointmentAction } from "../actions";
 
 export const metadata: Metadata = { title: "Agendamento confirmado" };
 
@@ -128,6 +130,10 @@ export default async function ConfirmacaoPage({
                 <p className="text-sm font-medium capitalize text-foreground">
                   {dataFormatada} às {horaFormatada}
                 </p>
+                <ClientPushOptIn
+                  onSubscribe={subscribeClientPushByAppointmentAction.bind(null, slug, appointmentId)}
+                  label="Receber lembrete por notificação"
+                />
                 <div className="mt-2 flex w-full flex-col gap-2">
                   <Button
                     variant="outline"

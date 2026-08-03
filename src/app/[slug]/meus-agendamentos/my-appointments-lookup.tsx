@@ -7,8 +7,10 @@ import { Search } from "lucide-react";
 import {
   findAppointmentsAction,
   cancelAppointmentAction,
+  subscribeClientPushByPhoneAction,
   type PublicAppointmentSummary,
 } from "../actions";
+import { ClientPushOptIn } from "@/components/client-push-opt-in";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,44 +99,48 @@ export function MyAppointmentsLookup({ slug, timezone }: { slug: string; timezon
             Nenhum agendamento futuro encontrado para esse número.
           </p>
         ) : (
-          <ul className="space-y-2">
-            {agendamentos.map((agendamento) => (
-              <li key={agendamento.id}>
-                <Card>
-                  <CardContent className="flex items-center justify-between gap-3 py-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {agendamento.servicoNome}
-                      </p>
-                      <p className="text-sm text-muted-foreground capitalize">
-                        {new Intl.DateTimeFormat("pt-BR", {
-                          weekday: "short",
-                          day: "2-digit",
-                          month: "2-digit",
-                        }).format(new Date(agendamento.inicio))}{" "}
-                        às {formatInTimeZone(new Date(agendamento.inicio), timezone, "HH:mm")}
-                      </p>
-                    </div>
-                    {agendamento.podeCancelar ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAlvoCancelamento(agendamento)}
-                        disabled={cancelando === agendamento.id}
-                      >
-                        Cancelar
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        Fora do prazo
-                      </span>
-                    )}
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ClientPushOptIn
+              onSubscribe={(sub) => subscribeClientPushByPhoneAction(slug, telefone, sub)}
+              label="Ativar lembretes por notificação"
+            />
+            <ul className="space-y-2">
+              {agendamentos.map((agendamento) => (
+                <li key={agendamento.id}>
+                  <Card>
+                    <CardContent className="flex items-center justify-between gap-3 py-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">
+                          {agendamento.servicoNome}
+                        </p>
+                        <p className="text-sm text-muted-foreground capitalize">
+                          {new Intl.DateTimeFormat("pt-BR", {
+                            weekday: "short",
+                            day: "2-digit",
+                            month: "2-digit",
+                          }).format(new Date(agendamento.inicio))}{" "}
+                          às {formatInTimeZone(new Date(agendamento.inicio), timezone, "HH:mm")}
+                        </p>
+                      </div>
+                      {agendamento.podeCancelar ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAlvoCancelamento(agendamento)}
+                          disabled={cancelando === agendamento.id}
+                        >
+                          Cancelar
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Fora do prazo</span>
+                      )}
+                    </CardContent>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          </>
         )
       ) : null}
 

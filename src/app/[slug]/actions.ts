@@ -36,6 +36,83 @@ export async function findClientNameByPhoneAction(
   return client ? { nome: client.nome } : null;
 }
 
+type ClientPushSubscriptionInput = { endpoint: string; keys: { p256dh: string; auth: string } };
+type SubscribeClientPushResult = { ok: true } | { ok: false; error: string };
+
+async function upsertClientPushSubscription(
+  clientId: string,
+  subscription: ClientPushSubscriptionInput,
+): Promise<SubscribeClientPushResult> {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .upsert(
+      { client_id: clientId, endpoint: subscription.endpoint, keys: subscription.keys },
+      { onConflict: "endpoint" },
+    );
+  if (error) return { ok: false, error: "Não foi possível ativar as notificações." };
+  return { ok: true };
+}
+
+// Usado na página de confirmação — o cliente já está identificado pelo
+// próprio agendamento que acabou de criar (o UUID na URL funciona como
+// identificador, mesmo padrão de confiança já usado no resto dessa página).
+export async function subscribeClientPushByAppointmentAction(
+  slug: string,
+  appointmentId: string,
+  subscription: ClientPushSubscriptionInput,
+): Promise<SubscribeClientPushResult> {
+  const supabase = createAdminClient();
+  const { data: appointment } = await supabase
+    .from("appointments")
+    .select("client_id, business_id")
+    .eq("id", appointmentId)
+    .maybeSingle();
+  if (!appointment) return { ok: false, error: "Agendamento não encontrado." };
+
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!business || business.id !== appointment.business_id) {
+    return { ok: false, error: "Agendamento não encontrado." };
+  }
+
+  return upsertClientPushSubscription(appointment.client_id, subscription);
+}
+
+// Usado em "meus agendamentos" — o cliente já se identificou pelo telefone
+// na busca; resolvemos o client_id de novo aqui em vez de confiar em algo
+// vindo do browser, mesma cautela do resto do fluxo público.
+export async function subscribeClientPushByPhoneAction(
+  slug: string,
+  telefone: string,
+  subscription: ClientPushSubscriptionInput,
+): Promise<SubscribeClientPushResult> {
+  if (!isValidBrazilianPhone(telefone)) {
+    return { ok: false, error: "Telefone inválido." };
+  }
+
+  const supabase = createAdminClient();
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!business) return { ok: false, error: "Loja não encontrada." };
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("business_id", business.id)
+    .eq("telefone", normalizePhone(telefone))
+    .maybeSingle();
+  if (!client) return { ok: false, error: "Cliente não encontrado." };
+
+  return upsertClientPushSubscription(client.id, subscription);
+}
+
 export async function getAvailableSlotsAction(
   slug: string,
   serviceId: string,
