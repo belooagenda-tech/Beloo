@@ -38,7 +38,7 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
       password: values.senha,
       options: {
         data: { nome: values.nome, telefone: values.telefone },
-        emailRedirectTo: `${window.location.origin}/entrar`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`,
       },
     });
     setSubmitting(false);
