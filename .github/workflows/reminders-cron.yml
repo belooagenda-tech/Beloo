@@ -1,0 +1,16 @@
+name: Lembretes de agendamento
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar /api/cron/reminders
+        run: |
+          curl -sf -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_TARGET_URL }}/api/cron/reminders"
