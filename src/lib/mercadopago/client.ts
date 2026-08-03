@@ -148,3 +148,90 @@ export async function refundPayment(accessToken: string, paymentId: string): Pro
     await parseJsonOrThrow(response, "reembolsar pagamento");
   }
 }
+
+// Cobrança recorrente (assinaturas/planos). Diferente do Checkout Pro usado
+// na entrada, essa API não foi validada contra um token OAuth de conta
+// conectada (Connect) no sandbox real do Mercado Pago — o shape da resposta
+// e a propagação de external_reference nas cobranças seguintes precisam ser
+// confirmados em produção antes de anunciar essa via como 100% confiável.
+export type CreatePreapprovalInput = {
+  reason: string;
+  externalReference: string;
+  payerEmail: string;
+  amount: number;
+  backUrl: string;
+};
+
+export type MpPreapproval = {
+  id: string;
+  initPoint: string;
+  status: string;
+};
+
+export async function createPreapproval(
+  accessToken: string,
+  input: CreatePreapprovalInput,
+): Promise<MpPreapproval> {
+  const response = await fetch(`${API_BASE}/preapproval`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      reason: input.reason,
+      external_reference: input.externalReference,
+      payer_email: input.payerEmail,
+      back_url: input.backUrl,
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: input.amount,
+        currency_id: "BRL",
+      },
+    }),
+  });
+  const data = await parseJsonOrThrow(response, "criar assinatura recorrente");
+  return { id: String(data.id), initPoint: data.init_point, status: data.status };
+}
+
+export type MpPreapprovalDetails = {
+  id: string;
+  status: string;
+  chargedQuantity: number | null;
+  lastChargedDate: string | null;
+};
+
+export async function getPreapproval(
+  accessToken: string,
+  preapprovalId: string,
+): Promise<MpPreapprovalDetails> {
+  const response = await fetch(`${API_BASE}/preapproval/${preapprovalId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = await parseJsonOrThrow(response, "consultar assinatura recorrente");
+  return {
+    id: String(data.id),
+    status: data.status,
+    chargedQuantity: data.summarized?.charged_quantity ?? null,
+    lastChargedDate: data.summarized?.last_charged_date ?? null,
+  };
+}
+
+export async function updatePreapprovalStatus(
+  accessToken: string,
+  preapprovalId: string,
+  status: "cancelled" | "paused",
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/preapproval/${preapprovalId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) {
+    await parseJsonOrThrow(response, "atualizar assinatura recorrente");
+  }
+}

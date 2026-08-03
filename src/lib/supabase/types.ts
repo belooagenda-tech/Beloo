@@ -98,8 +98,13 @@ export type ClientPlan = {
   servicos_inclusos: { service_id: string; quantidade: number | null }[];
   ciclo_dias: number;
   ativo: boolean;
+  permite_pagamento_online: boolean;
   created_at: string;
 };
+
+export type FormaCobranca = "manual" | "cartao_recorrente" | "pix_ciclico";
+
+export type PagamentoStatusPlano = "pendente" | "ativo" | "atrasado" | "cancelado";
 
 export type ClientPlanSub = {
   id: string;
@@ -109,7 +114,29 @@ export type ClientPlanSub = {
   data_renovacao: string;
   creditos_usados: Record<string, number>;
   ativo: boolean;
+  forma_cobranca: FormaCobranca;
+  pagamento_status: PagamentoStatusPlano;
+  pagamento_expira_em: string | null;
+  mp_preapproval_id: string | null;
+  mp_preapproval_status: string | null;
   created_at: string;
+};
+
+export type ClientPlanPaymentStatus = "pendente" | "pago" | "falhou" | "reembolsado";
+
+export type ClientPlanPayment = {
+  id: string;
+  plan_sub_id: string;
+  business_id: string;
+  ciclo_referencia: string;
+  valor: number;
+  forma_pagamento: "cartao" | "pix";
+  status: ClientPlanPaymentStatus;
+  mp_payment_id: string | null;
+  mp_preapproval_id: string | null;
+  pago_em: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Appointment = {
@@ -134,7 +161,8 @@ export type NotificationTipo =
   | "novo_agendamento"
   | "cancelamento"
   | "lembrete_dia"
-  | "entrada_paga";
+  | "entrada_paga"
+  | "plano_pago";
 
 export type Notification = {
   id: string;
@@ -191,6 +219,7 @@ export type Database = {
       clients: Table<Client>;
       client_plans: Table<ClientPlan>;
       client_plan_subs: Table<ClientPlanSub>;
+      client_plan_payments: Table<ClientPlanPayment>;
       appointments: Table<Appointment>;
       appointment_payments: Table<AppointmentPayment>;
       mp_connections: Table<MpConnection>;

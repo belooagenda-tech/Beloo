@@ -7,4 +7,5 @@ export type PlanListItem = {
   servicos_inclusos: { service_id: string; quantidade: number | null }[];
   ciclo_dias: number;
   ativo: boolean;
+  permite_pagamento_online: boolean;
 };

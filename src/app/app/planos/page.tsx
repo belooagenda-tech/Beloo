@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { PlansManager } from "./plans-manager";
 
 export const metadata: Metadata = { title: "Planos" };
@@ -16,7 +17,8 @@ export default async function PlanosPage() {
     .eq("profile_id", user!.id)
     .single();
 
-  const [{ data: services }, { data: plans }] = await Promise.all([
+  const admin = createAdminClient();
+  const [{ data: services }, { data: plans }, { data: mpConnection }] = await Promise.all([
     supabase
       .from("services")
       .select("id, nome")
@@ -25,9 +27,10 @@ export default async function PlanosPage() {
       .order("nome", { ascending: true }),
     supabase
       .from("client_plans")
-      .select("id, nome, valor_mensal, servicos_inclusos, ciclo_dias, ativo")
+      .select("id, nome, valor_mensal, servicos_inclusos, ciclo_dias, ativo, permite_pagamento_online")
       .eq("business_id", business!.id)
       .order("created_at", { ascending: true }),
+    admin.from("mp_connections").select("business_id").eq("business_id", business!.id).maybeSingle(),
   ]);
 
   return (
@@ -40,7 +43,12 @@ export default async function PlanosPage() {
         </p>
       </div>
 
-      <PlansManager businessId={business!.id} services={services ?? []} initialPlans={plans ?? []} />
+      <PlansManager
+        businessId={business!.id}
+        services={services ?? []}
+        initialPlans={plans ?? []}
+        mpConnected={Boolean(mpConnection)}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { addDays, formatISO } from "date-fns";
 import { toast } from "sonner";
 import { RefreshCw, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { cancelPlanSubAction } from "./plan-sub-actions";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -47,27 +48,29 @@ export function PlanActions({ plan }: { plan: ActivePlan }) {
 
   async function handleCancel() {
     setCancelling(true);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("client_plan_subs")
-      .update({ ativo: false })
-      .eq("id", plan.subId);
+    const resultado = await cancelPlanSubAction(plan.subId);
     setCancelling(false);
 
-    if (error) {
-      toast.error("Não foi possível cancelar o plano.");
+    if (!resultado.ok) {
+      toast.error(resultado.error);
       return;
     }
-    toast.success("Plano cancelado.");
+    if (resultado.aviso) {
+      toast.warning(resultado.aviso);
+    } else {
+      toast.success("Plano cancelado.");
+    }
     router.refresh();
   }
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" size="sm" onClick={handleRenew} disabled={renewing}>
-        <RefreshCw className="size-4" />
-        {renewing ? "Renovando..." : "Renovar ciclo"}
-      </Button>
+      {plan.formaCobranca === "manual" ? (
+        <Button variant="outline" size="sm" onClick={handleRenew} disabled={renewing}>
+          <RefreshCw className="size-4" />
+          {renewing ? "Renovando..." : "Renovar ciclo"}
+        </Button>
+      ) : null}
 
       <AlertDialog>
         <AlertDialogTrigger

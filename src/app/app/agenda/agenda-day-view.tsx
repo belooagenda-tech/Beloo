@@ -9,6 +9,7 @@ import { DayNavigator } from "./day-navigator";
 import { AppointmentCard } from "./appointment-card";
 import { PaymentModal } from "./payment-modal";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
+import { cancelAppointmentFromAgendaAction } from "./actions";
 import type { AgendaAppointment, AgendaClient, AgendaPayment, AgendaService } from "./types";
 
 export function AgendaDayView({
@@ -50,6 +51,20 @@ export function AgendaDayView({
     }
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     toast.success("Agendamento atualizado.");
+  }
+
+  async function handleCancel(id: string) {
+    const resultado = await cancelAppointmentFromAgendaAction(id);
+    if (!resultado.ok) {
+      toast.error(resultado.error);
+      return;
+    }
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelado" } : a)));
+    if (resultado.avisoReembolso) {
+      toast.warning(resultado.avisoReembolso);
+    } else {
+      toast.success("Agendamento cancelado.");
+    }
   }
 
   function openPaymentModal(appointment: AgendaAppointment) {
@@ -124,7 +139,7 @@ export function AgendaDayView({
                 payment={paymentsByAppointment.get(appointment.id)}
                 timezone={timezone}
                 onConfirm={() => updateStatus(appointment.id, "confirmado")}
-                onCancel={() => updateStatus(appointment.id, "cancelado")}
+                onCancel={() => handleCancel(appointment.id)}
                 onNoShow={() => updateStatus(appointment.id, "nao_compareceu")}
                 onComplete={() => openPaymentModal(appointment)}
               />

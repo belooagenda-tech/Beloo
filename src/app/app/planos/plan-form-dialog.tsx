@@ -40,12 +40,14 @@ function PlanForm({
   businessId,
   services,
   plan,
+  mpConnected,
   onOpenChange,
   onSaved,
 }: {
   businessId: string;
   services: PlanServiceLookup[];
   plan: PlanListItem | null;
+  mpConnected: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (plan: PlanListItem) => void;
 }) {
@@ -64,6 +66,9 @@ function PlanForm({
 
   const [itens, setItens] = useState<ServicoIncluso[]>(itensIniciais(plan));
   const [ativo, setAtivo] = useState(plan?.ativo ?? true);
+  const [permitePagamentoOnline, setPermitePagamentoOnline] = useState(
+    plan?.permite_pagamento_online ?? false,
+  );
   const [itensError, setItensError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +110,7 @@ function PlanForm({
         quantidade: item.ilimitado ? null : item.quantidade,
       })),
       ativo,
+      permite_pagamento_online: permitePagamentoOnline,
     };
 
     const query = plan
@@ -112,7 +118,7 @@ function PlanForm({
       : supabase.from("client_plans").insert(payload);
 
     const { data, error: saveError } = await query
-      .select("id, nome, valor_mensal, servicos_inclusos, ciclo_dias, ativo")
+      .select("id, nome, valor_mensal, servicos_inclusos, ciclo_dias, ativo, permite_pagamento_online")
       .single();
     setSubmitting(false);
 
@@ -250,6 +256,25 @@ function PlanForm({
         </div>
       ) : null}
 
+      <div className="space-y-1.5 rounded-md border border-border p-3">
+        <div className="flex items-center justify-between gap-3">
+          <Label htmlFor="permite-pagamento-online" className="text-sm font-medium text-foreground">
+            Permitir pagamento online
+          </Label>
+          <Switch
+            id="permite-pagamento-online"
+            checked={permitePagamentoOnline}
+            disabled={!mpConnected}
+            onCheckedChange={setPermitePagamentoOnline}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {mpConnected
+            ? "O cliente pode assinar e pagar esse plano pelo link, com cartão (cobrança automática) ou Pix (por ciclo)."
+            : "Conecte sua conta do Mercado Pago em Configurações para poder ativar isso."}
+        </p>
+      </div>
+
       <DialogFooter>
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? "Salvando..." : "Salvar plano"}
@@ -265,6 +290,7 @@ export function PlanFormDialog({
   plan,
   open,
   formKey,
+  mpConnected,
   onOpenChange,
   onSaved,
 }: {
@@ -273,6 +299,7 @@ export function PlanFormDialog({
   plan: PlanListItem | null;
   open: boolean;
   formKey: number;
+  mpConnected: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (plan: PlanListItem) => void;
 }) {
@@ -288,6 +315,7 @@ export function PlanFormDialog({
             businessId={businessId}
             services={services}
             plan={plan}
+            mpConnected={mpConnected}
             onOpenChange={onOpenChange}
             onSaved={onSaved}
           />

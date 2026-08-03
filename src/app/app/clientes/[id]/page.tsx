@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ClientProfile } from "./client-profile";
-import type { ActivePlan } from "./types";
+import type { ActivePlan, PlanPaymentHistoryItem } from "./types";
 
 const getClientAndBusiness = cache(async (id: string) => {
   const supabase = await createClient();
@@ -13,7 +13,7 @@ const getClientAndBusiness = cache(async (id: string) => {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, timezone")
+    .select("id, timezone, slug")
     .eq("profile_id", user!.id)
     .single();
 
@@ -60,13 +60,13 @@ export default async function ClientDetailPage({
         .order("inicio", { ascending: false }),
       supabase
         .from("client_plan_subs")
-        .select("id, plan_id, data_renovacao, creditos_usados")
+        .select("id, plan_id, data_renovacao, creditos_usados, forma_cobranca, pagamento_status")
         .eq("client_id", client.id)
         .eq("ativo", true)
         .maybeSingle(),
       supabase
         .from("client_plans")
-        .select("id, nome, valor_mensal, ciclo_dias")
+        .select("id, nome, valor_mensal, ciclo_dias, permite_pagamento_online")
         .eq("business_id", business!.id)
         .eq("ativo", true)
         .order("nome", { ascending: true }),
@@ -82,6 +82,7 @@ export default async function ClientDetailPage({
       : { data: [] };
 
   let activePlan: ActivePlan | null = null;
+  let planPayments: PlanPaymentHistoryItem[] = [];
   if (sub) {
     const { data: plan } = await supabase
       .from("client_plans")
@@ -102,7 +103,19 @@ export default async function ClientDetailPage({
           usados: sub.creditos_usados[item.service_id] ?? 0,
           limite: item.quantidade,
         })),
+        formaCobranca: sub.forma_cobranca,
+        pagamentoStatus: sub.pagamento_status,
       };
+
+      if (sub.forma_cobranca !== "manual") {
+        const { data: history } = await supabase
+          .from("client_plan_payments")
+          .select("id, ciclo_referencia, valor, forma_pagamento, status, pago_em")
+          .eq("plan_sub_id", sub.id)
+          .order("ciclo_referencia", { ascending: false })
+          .limit(5);
+        planPayments = history ?? [];
+      }
     }
   }
 
@@ -116,11 +129,13 @@ export default async function ClientDetailPage({
   return (
     <ClientProfile
       client={client}
+      slug={business!.slug}
       timezone={business!.timezone}
       services={services ?? []}
       appointments={appointments ?? []}
       payments={payments ?? []}
       activePlan={activePlan}
+      planPayments={planPayments}
       availablePlans={availablePlans ?? []}
       totalGastoAvulso={totalGastoAvulso}
       totalVisitas={totalVisitas}

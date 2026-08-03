@@ -17,8 +17,22 @@ import type {
   ClientDetail,
   HistoryAppointment,
   HistoryPayment,
+  PlanPaymentHistoryItem,
   ServiceLookup,
 } from "./types";
+
+const FORMA_COBRANCA_LABEL: Record<ActivePlan["formaCobranca"], string> = {
+  manual: "",
+  cartao_recorrente: "Renovação automática via cartão",
+  pix_ciclico: "Pagamento por Pix a cada ciclo",
+};
+
+const PAGAMENTO_STATUS_LABEL: Record<ActivePlan["pagamentoStatus"], { label: string; className: string }> = {
+  pendente: { label: "Aguardando pagamento", className: "bg-warning/15 text-warning" },
+  ativo: { label: "Em dia", className: "bg-success/15 text-success" },
+  atrasado: { label: "Atrasado", className: "bg-destructive/10 text-destructive" },
+  cancelado: { label: "Cancelado", className: "bg-muted text-muted-foreground" },
+};
 
 const STATUS_META: Record<AppointmentStatus, { label: string; className: string }> = {
   aguardando_pagamento: { label: "Aguardando pagamento", className: "bg-warning/15 text-warning" },
@@ -41,22 +55,26 @@ function formatarData(iso: string) {
 
 export function ClientProfile({
   client: clientInicial,
+  slug,
   timezone,
   services,
   appointments,
   payments,
   activePlan,
+  planPayments,
   availablePlans,
   totalGastoAvulso,
   totalVisitas,
   ultimaVisita,
 }: {
   client: ClientDetail;
+  slug: string;
   timezone: string;
   services: ServiceLookup[];
   appointments: HistoryAppointment[];
   payments: HistoryPayment[];
   activePlan: ActivePlan | null;
+  planPayments: PlanPaymentHistoryItem[];
   availablePlans: AvailablePlan[];
   totalGastoAvulso: number;
   totalVisitas: number;
@@ -122,12 +140,19 @@ export function ClientProfile({
 
       {activePlan ? (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle className="text-base">Plano ativo: {activePlan.planNome}</CardTitle>
+            {activePlan.formaCobranca !== "manual" ? (
+              <Badge className={PAGAMENTO_STATUS_LABEL[activePlan.pagamentoStatus].className} variant="secondary">
+                {PAGAMENTO_STATUS_LABEL[activePlan.pagamentoStatus].label}
+              </Badge>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Renova em {formatarData(activePlan.dataRenovacao)}
+              {activePlan.formaCobranca !== "manual"
+                ? FORMA_COBRANCA_LABEL[activePlan.formaCobranca]
+                : `Renova em ${formatarData(activePlan.dataRenovacao)}`}
             </p>
             <ul className="space-y-1">
               {activePlan.itens.map((item) => (
@@ -142,6 +167,20 @@ export function ClientProfile({
                 </li>
               ))}
             </ul>
+            {planPayments.length > 0 ? (
+              <div className="space-y-1 border-t border-border pt-2">
+                <p className="text-xs font-medium text-muted-foreground">Últimos pagamentos</p>
+                {planPayments.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{formatarData(p.ciclo_referencia)}</span>
+                    <span>
+                      {formatarPreco(p.valor)} · {p.forma_pagamento === "cartao" ? "Cartão" : "Pix"} ·{" "}
+                      {p.status === "pago" ? "Pago" : p.status === "reembolsado" ? "Reembolsado" : p.status === "falhou" ? "Falhou" : "Pendente"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <PlanActions plan={activePlan} />
           </CardContent>
         </Card>
@@ -149,7 +188,12 @@ export function ClientProfile({
         <Card className="border-dashed">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
             <p className="text-sm text-muted-foreground">Este cliente não tem plano ativo.</p>
-            <AssignPlanDialog clientId={client.id} availablePlans={availablePlans} />
+            <AssignPlanDialog
+              clientId={client.id}
+              clientTelefone={client.telefone}
+              slug={slug}
+              availablePlans={availablePlans}
+            />
           </CardContent>
         </Card>
       )}

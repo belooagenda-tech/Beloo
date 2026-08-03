@@ -28,10 +28,12 @@ export function PlansManager({
   businessId,
   services,
   initialPlans,
+  mpConnected,
 }: {
   businessId: string;
   services: PlanServiceLookup[];
   initialPlans: PlanListItem[];
+  mpConnected: boolean;
 }) {
   const [plans, setPlans] = useState(initialPlans);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -108,6 +110,11 @@ export function PlansManager({
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
+                      {plan.permite_pagamento_online ? (
+                        <Badge className="bg-primary/10 text-primary" variant="secondary">
+                          Pagamento online
+                        </Badge>
+                      ) : null}
                       {!plan.ativo ? <Badge variant="secondary">Inativo</Badge> : null}
                       <Button variant="ghost" size="icon" onClick={() => openEdit(plan)} aria-label="Editar plano">
                         <Pencil className="size-4" />
@@ -143,6 +150,7 @@ export function PlansManager({
         plan={editing}
         open={dialogOpen}
         formKey={dialogKey}
+        mpConnected={mpConnected}
         onOpenChange={setDialogOpen}
         onSaved={handleSaved}
       />

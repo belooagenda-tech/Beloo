@@ -54,6 +54,14 @@ export const OPCOES_ENTRADA_PERCENTUAL = [
 // antes de ser liberado automaticamente (ver /api/cron/expire-entradas).
 export const ENTRADA_EXPIRACAO_MINUTOS = 30;
 
+// Tempo que um pedido de assinatura de plano fica pendente aguardando o
+// cliente completar o pagamento/autorização antes de expirar.
+export const PLANO_ASSINATURA_EXPIRACAO_MINUTOS = 60;
+
+// Quantos dias antes do vencimento o cron de renovação Pix gera um novo
+// link de cobrança e lembra o cliente.
+export const PLANO_PIX_LEMBRETE_DIAS_ANTES = 3;
+
 // Precisa ficar em sincronia com a checagem em is_slug_available() /
 // slug_not_reserved (supabase/migrations/20260731000006_reserved_slugs.sql).
 export const SLUGS_RESERVADOS = [

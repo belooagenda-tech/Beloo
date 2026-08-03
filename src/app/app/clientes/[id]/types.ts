@@ -1,4 +1,10 @@
-import type { AppointmentStatus, FormaPagamento, OrigemPagamento } from "@/lib/supabase/types";
+import type {
+  AppointmentStatus,
+  FormaCobranca,
+  FormaPagamento,
+  OrigemPagamento,
+  PagamentoStatusPlano,
+} from "@/lib/supabase/types";
 
 export type ClientDetail = {
   id: string;
@@ -31,6 +37,8 @@ export type ActivePlan = {
   dataRenovacao: string;
   cicloDias: number;
   itens: { serviceId: string; serviceNome: string; usados: number; limite: number | null }[];
+  formaCobranca: FormaCobranca;
+  pagamentoStatus: PagamentoStatusPlano;
 };
 
 export type AvailablePlan = {
@@ -38,4 +46,14 @@ export type AvailablePlan = {
   nome: string;
   valor_mensal: number;
   ciclo_dias: number;
+  permite_pagamento_online: boolean;
+};
+
+export type PlanPaymentHistoryItem = {
+  id: string;
+  ciclo_referencia: string;
+  valor: number;
+  forma_pagamento: "cartao" | "pix";
+  status: "pendente" | "pago" | "falhou" | "reembolsado";
+  pago_em: string | null;
 };
