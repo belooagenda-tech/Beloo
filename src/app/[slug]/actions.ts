@@ -12,6 +12,30 @@ import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { createPreference, refundPayment } from "@/lib/mercadopago/client";
 import type { AppointmentStatus } from "@/lib/supabase/types";
 
+export async function findClientNameByPhoneAction(
+  slug: string,
+  telefone: string,
+): Promise<{ nome: string } | null> {
+  if (!isValidBrazilianPhone(telefone)) return null;
+
+  const supabase = createAdminClient();
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!business) return null;
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("nome")
+    .eq("business_id", business.id)
+    .eq("telefone", normalizePhone(telefone))
+    .maybeSingle();
+
+  return client ? { nome: client.nome } : null;
+}
+
 export async function getAvailableSlotsAction(
   slug: string,
   serviceId: string,

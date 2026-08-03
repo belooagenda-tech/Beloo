@@ -70,7 +70,11 @@ export function GeneralSettingsCard({
               onValueChange={(v) => setAntecedenciaMinutos(Number(v))}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>
+                  {(value: string | null) =>
+                    OPCOES_ANTECEDENCIA.find((o) => String(o.valor) === value)?.label ?? "Escolha"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {OPCOES_ANTECEDENCIA.map((opcao) => (
@@ -110,7 +114,11 @@ export function GeneralSettingsCard({
               onValueChange={(v) => setCancelamentoMinHoras(Number(v))}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>
+                  {(value: string | null) =>
+                    OPCOES_CANCELAMENTO.find((o) => String(o.valor) === value)?.label ?? "Escolha"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {OPCOES_CANCELAMENTO.map((opcao) => (

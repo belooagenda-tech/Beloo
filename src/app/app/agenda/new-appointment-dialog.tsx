@@ -7,8 +7,9 @@ import { addMinutes } from "date-fns";
 import { fromZonedTime } from "date-fns-tz";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { normalizePhone } from "@/lib/phone";
+import { formatPhoneBR, normalizePhone } from "@/lib/phone";
 import { manualAppointmentSchema, type ManualAppointmentInput } from "@/lib/validations/appointment";
+import { ClientPicker } from "./client-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,11 +52,17 @@ function NewAppointmentForm({
     register,
     handleSubmit,
     control,
+    setValue,
     formState: { errors },
   } = useForm<ManualAppointmentInput>({
     resolver: zodResolver(manualAppointmentSchema),
     defaultValues: { data: dataSelecionada, hora: "09:00", serviceId: services[0]?.id ?? "" },
   });
+
+  function handlePickClient(client: AgendaClient) {
+    setValue("nome", client.nome, { shouldValidate: true });
+    setValue("telefone", formatPhoneBR(client.telefone), { shouldValidate: true });
+  }
 
   async function onSubmit(values: ManualAppointmentInput) {
     setSubmitting(true);
@@ -131,6 +138,8 @@ function NewAppointmentForm({
         </Alert>
       ) : null}
 
+      <ClientPicker businessId={businessId} onSelect={handlePickClient} />
+
       <div className="space-y-1.5">
         <Label htmlFor="nome-manual">Nome do cliente</Label>
         <Input id="nome-manual" {...register("nome")} />
@@ -153,7 +162,12 @@ function NewAppointmentForm({
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Escolha o serviço" />
+                <SelectValue>
+                  {(value: string | null) => {
+                    const service = services.find((s) => s.id === value);
+                    return service ? `${service.nome} · ${service.duracao_min} min` : "Escolha o serviço";
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {services.map((service) => (

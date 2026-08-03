@@ -243,7 +243,11 @@ function PaymentForm({
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Escolha..." />
+                <SelectValue>
+                  {(value: FormaPagamento | null) =>
+                    FORMAS.find((f) => f.value === value)?.label ?? "Escolha..."
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {FORMAS.map((forma) => (

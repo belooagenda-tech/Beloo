@@ -201,7 +201,11 @@ function PlanForm({
                   onValueChange={(value) => value && updateItem(index, { serviceId: value })}
                 >
                   <SelectTrigger className="flex-1">
-                    <SelectValue />
+                    <SelectValue>
+                      {(value: string | null) =>
+                        services.find((s) => s.id === value)?.nome ?? "Serviço"
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={item.serviceId}>

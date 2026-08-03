@@ -131,6 +131,7 @@ export function PublicBookingFlow({
 
           {step === "dados" && selectedService && selectedIso ? (
             <ClientInfoForm
+              slug={business.slug}
               service={selectedService}
               inicioISO={selectedIso}
               timezone={business.timezone}

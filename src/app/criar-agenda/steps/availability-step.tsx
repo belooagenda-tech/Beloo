@@ -74,7 +74,11 @@ export function AvailabilityStep({
             onValueChange={(v) => setAntecedenciaMinutos(Number(v))}
           >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue>
+                {(value: string | null) =>
+                  OPCOES_ANTECEDENCIA.find((o) => String(o.valor) === value)?.label ?? "Escolha"
+                }
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {OPCOES_ANTECEDENCIA.map((opcao) => (

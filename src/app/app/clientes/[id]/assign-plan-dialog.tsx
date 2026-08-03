@@ -152,7 +152,13 @@ function AssignPlanForm({
 
       <Select value={planId} onValueChange={(value) => setPlanId(value ?? "")}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Escolha um plano" />
+          <SelectValue>
+            {(value: string | null) => {
+              const p = availablePlans.find((item) => item.id === value);
+              if (!p) return "Escolha um plano";
+              return `${p.nome} · ${formatarPreco(p.valor_mensal)}/mês${p.permite_pagamento_online ? " · pagamento online" : ""}`;
+            }}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {availablePlans.map((p) => (

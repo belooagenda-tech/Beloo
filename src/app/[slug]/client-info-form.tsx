@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formatInTimeZone } from "date-fns-tz";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { clientInfoSchema, type ClientInfoInput } from "@/lib/validations/public-booking";
+import { isValidBrazilianPhone } from "@/lib/phone";
+import { findClientNameByPhoneAction } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +20,7 @@ function formatarPreco(preco: number) {
 }
 
 export function ClientInfoForm({
+  slug,
   service,
   inicioISO,
   timezone,
@@ -26,6 +30,7 @@ export function ClientInfoForm({
   submitting,
   error,
 }: {
+  slug: string;
   service: PublicService;
   inicioISO: string;
   timezone: string;
@@ -38,8 +43,41 @@ export function ClientInfoForm({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<ClientInfoInput>({ resolver: zodResolver(clientInfoSchema) });
+
+  const [clienteReconhecido, setClienteReconhecido] = useState<string | null>(null);
+  const nomePreenchidoAutomaticamente = useRef(false);
+  const telefone = watch("telefone");
+  const nome = watch("nome");
+
+  useEffect(() => {
+    if (!telefone || !isValidBrazilianPhone(telefone)) {
+      setClienteReconhecido(null);
+      return;
+    }
+    let ativo = true;
+    const timeout = setTimeout(async () => {
+      const resultado = await findClientNameByPhoneAction(slug, telefone);
+      if (!ativo) return;
+      if (resultado) {
+        setClienteReconhecido(resultado.nome.split(" ")[0]);
+        if (!nome || nomePreenchidoAutomaticamente.current) {
+          setValue("nome", resultado.nome, { shouldValidate: true });
+          nomePreenchidoAutomaticamente.current = true;
+        }
+      } else {
+        setClienteReconhecido(null);
+      }
+    }, 500);
+    return () => {
+      ativo = false;
+      clearTimeout(timeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telefone, slug]);
 
   const dataFormatada = new Intl.DateTimeFormat("pt-BR", {
     weekday: "long",
@@ -78,14 +116,6 @@ export function ClientInfoForm({
         ) : null}
 
         <div className="space-y-1.5">
-          <Label htmlFor="nome-cliente">Seu nome</Label>
-          <Input id="nome-cliente" placeholder="Como podemos te chamar" {...register("nome")} />
-          {errors.nome ? (
-            <p className="text-sm text-destructive">{errors.nome.message}</p>
-          ) : null}
-        </div>
-
-        <div className="space-y-1.5">
           <Label htmlFor="telefone-cliente">WhatsApp</Label>
           <Input
             id="telefone-cliente"
@@ -95,6 +125,21 @@ export function ClientInfoForm({
           />
           {errors.telefone ? (
             <p className="text-sm text-destructive">{errors.telefone.message}</p>
+          ) : null}
+        </div>
+
+        {clienteReconhecido ? (
+          <p className="flex items-center gap-1.5 text-sm text-success">
+            <CheckCircle2 className="size-4" />
+            Bem-vindo(a) de volta, {clienteReconhecido}! Já preenchemos seu nome.
+          </p>
+        ) : null}
+
+        <div className="space-y-1.5">
+          <Label htmlFor="nome-cliente">Seu nome</Label>
+          <Input id="nome-cliente" placeholder="Como podemos te chamar" {...register("nome")} />
+          {errors.nome ? (
+            <p className="text-sm text-destructive">{errors.nome.message}</p>
           ) : null}
         </div>
 

@@ -154,7 +154,11 @@ export function ExceptionsCard({
                 <Label>Tipo</Label>
                 <Select value={tipo} onValueChange={(v) => setTipo(v as TipoExcecao)}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {(value: string | null) =>
+                        value === "horario_especial" ? "Horário especial" : "Folga (dia inteiro)"
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="folga">Folga (dia inteiro)</SelectItem>

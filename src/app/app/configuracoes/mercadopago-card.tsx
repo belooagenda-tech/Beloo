@@ -179,7 +179,11 @@ export function MercadoPagoCard({
               }}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>
+                  {(value: string | null) =>
+                    OPCOES_ENTRADA_PERCENTUAL.find((o) => String(o.valor) === value)?.label ?? "Escolha"
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {OPCOES_ENTRADA_PERCENTUAL.map((opcao) => (

@@ -85,7 +85,11 @@ export function BusinessInfoCard({
               render={({ field }) => (
                 <Select value={field.value} onValueChange={(v) => field.onChange(v ?? "")}>
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>
+                      {(value: string | null) =>
+                        CATEGORIAS.find((o) => o.value === value)?.label ?? "Escolha uma categoria"
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {CATEGORIAS.map((opcao) => (
