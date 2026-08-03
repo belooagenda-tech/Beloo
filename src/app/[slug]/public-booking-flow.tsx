@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
 import { CATEGORIAS } from "@/lib/constants";
@@ -57,6 +58,7 @@ export function PublicBookingFlow({
       inicioISO: selectedIso,
       nome: values.nome,
       telefone: values.telefone,
+      empresa: values.empresa,
     });
 
     if (!result.ok) {
@@ -93,7 +95,18 @@ export function PublicBookingFlow({
           </div>
 
           {step === "servico" ? (
-            <ServicePicker services={services} onSelect={handleSelectService} />
+            <div className="space-y-4">
+              <ServicePicker services={services} onSelect={handleSelectService} />
+              <p className="text-center text-sm text-muted-foreground">
+                Já tem um agendamento?{" "}
+                <Link
+                  href={`/${business.slug}/meus-agendamentos`}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Ver ou cancelar
+                </Link>
+              </p>
+            </div>
           ) : null}
 
           {step === "horario" && selectedService ? (

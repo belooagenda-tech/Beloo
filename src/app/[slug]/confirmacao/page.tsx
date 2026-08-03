@@ -79,11 +79,17 @@ export default async function ConfirmacaoPage({
               <p className="text-sm font-medium capitalize text-foreground">
                 {dataFormatada} às {horaFormatada}
               </p>
-              <Button
-                className="mt-2 w-full"
-                nativeButton={false}
-                render={<Link href={`/${slug}`}>Fazer outro agendamento</Link>}
-              />
+              <div className="mt-2 flex w-full flex-col gap-2">
+                <Button
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link href={`/${slug}/meus-agendamentos`}>Ver ou cancelar agendamento</Link>}
+                />
+                <Button
+                  nativeButton={false}
+                  render={<Link href={`/${slug}`}>Fazer outro agendamento</Link>}
+                />
+              </div>
             </CardContent>
           </Card>
         </div>

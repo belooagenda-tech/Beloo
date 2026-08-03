@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { OPCOES_ANTECEDENCIA } from "@/lib/constants";
+import { OPCOES_ANTECEDENCIA, OPCOES_CANCELAMENTO } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,15 +21,18 @@ export function GeneralSettingsCard({
   initialAntecedencia,
   initialLimiteDias,
   initialBufferPadrao,
+  initialCancelamentoMinHoras,
 }: {
   businessId: string;
   initialAntecedencia: number;
   initialLimiteDias: number;
   initialBufferPadrao: number;
+  initialCancelamentoMinHoras: number;
 }) {
   const [antecedenciaMinutos, setAntecedenciaMinutos] = useState(initialAntecedencia);
   const [limiteDias, setLimiteDias] = useState(initialLimiteDias);
   const [bufferPadrao, setBufferPadrao] = useState(initialBufferPadrao);
+  const [cancelamentoMinHoras, setCancelamentoMinHoras] = useState(initialCancelamentoMinHoras);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -41,6 +44,7 @@ export function GeneralSettingsCard({
         antecedencia_minima_min: antecedenciaMinutos,
         limite_dias_futuro: limiteDias,
         buffer_padrao_min: bufferPadrao,
+        cancelamento_min_horas: cancelamentoMinHoras,
       })
       .eq("id", businessId);
     setSaving(false);
@@ -58,7 +62,7 @@ export function GeneralSettingsCard({
         <CardTitle className="text-base">Regras de agendamento</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Antecedência mínima</Label>
             <Select
@@ -99,10 +103,30 @@ export function GeneralSettingsCard({
               onChange={(e) => setBufferPadrao(Number(e.target.value))}
             />
           </div>
+          <div className="space-y-1.5">
+            <Label>Cancelamento pelo cliente</Label>
+            <Select
+              value={String(cancelamentoMinHoras)}
+              onValueChange={(v) => setCancelamentoMinHoras(Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {OPCOES_CANCELAMENTO.map((opcao) => (
+                  <SelectItem key={opcao.valor} value={String(opcao.valor)}>
+                    {opcao.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           O buffer padrão é aplicado entre atendimentos quando o serviço não
-          define um buffer próprio.
+          define um buffer próprio. O prazo de cancelamento define até
+          quantas horas antes do horário marcado o cliente pode cancelar
+          sozinho pelo link público.
         </p>
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "Salvando..." : "Salvar configurações"}

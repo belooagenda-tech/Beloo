@@ -31,6 +31,16 @@ export const OPCOES_ANTECEDENCIA = [
   { valor: 1440, label: "1 dia" },
 ] as const;
 
+export const OPCOES_CANCELAMENTO = [
+  { valor: 0, label: "A qualquer momento" },
+  { valor: 2, label: "Até 2 horas antes" },
+  { valor: 6, label: "Até 6 horas antes" },
+  { valor: 12, label: "Até 12 horas antes" },
+  { valor: 24, label: "Até 24 horas antes" },
+  { valor: 48, label: "Até 48 horas antes" },
+  { valor: 72, label: "Até 72 horas antes" },
+] as const;
+
 // Precisa ficar em sincronia com a checagem em is_slug_available() /
 // slug_not_reserved (supabase/migrations/20260731000006_reserved_slugs.sql).
 export const SLUGS_RESERVADOS = [
@@ -42,6 +52,8 @@ export const SLUGS_RESERVADOS = [
   "offline",
   "esqueci-senha",
   "redefinir-senha",
+  "privacidade",
+  "termos",
   "icon.svg",
   "manifest.json",
   "favicon.ico",

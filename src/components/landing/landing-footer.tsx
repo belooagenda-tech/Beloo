@@ -13,12 +13,18 @@ export function LandingFooter() {
             O jeito simples de organizar a agenda de quem trabalha com beleza.
           </p>
         </div>
-        <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+        <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
           <Link href="/entrar" className="hover:text-foreground">
             Entrar
           </Link>
           <Link href="/criar-agenda" className="hover:text-foreground">
             Criar minha agenda
+          </Link>
+          <Link href="/privacidade" className="hover:text-foreground">
+            Privacidade
+          </Link>
+          <Link href="/termos" className="hover:text-foreground">
+            Termos de uso
           </Link>
         </nav>
       </div>

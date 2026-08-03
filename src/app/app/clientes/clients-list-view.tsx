@@ -3,21 +3,46 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { normalizePhone, formatPhoneBR } from "@/lib/phone";
 import { NewClientDialog } from "./new-client-dialog";
+import { CLIENTES_PAGE_SIZE } from "./constants";
 import type { ClientListItem } from "./types";
 
 export function ClientsListView({
   businessId,
   initialClients,
+  totalCount,
 }: {
   businessId: string;
   initialClients: ClientListItem[];
+  totalCount: number;
 }) {
   const [clients, setClients] = useState(initialClients);
   const [busca, setBusca] = useState("");
+  const [carregandoMais, setCarregandoMais] = useState(false);
+
+  const haMaisParaCarregar = clients.length < totalCount;
+
+  async function handleCarregarMais() {
+    setCarregandoMais(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("clients")
+      .select("id, nome, telefone, criado_em")
+      .eq("business_id", businessId)
+      .order("nome", { ascending: true })
+      .range(clients.length, clients.length + CLIENTES_PAGE_SIZE - 1);
+    setCarregandoMais(false);
+
+    if (data) {
+      setClients((prev) => [...prev, ...data]);
+    }
+  }
 
   const buscaDigits = normalizePhone(busca);
   const filtrados = clients.filter((client) => {
@@ -33,8 +58,8 @@ export function ClientsListView({
         <div>
           <h1 className="font-heading text-2xl font-semibold text-foreground">Clientes</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {clients.length} cliente{clients.length === 1 ? "" : "s"} cadastrado
-            {clients.length === 1 ? "" : "s"}.
+            {totalCount} cliente{totalCount === 1 ? "" : "s"} cadastrado
+            {totalCount === 1 ? "" : "s"}.
           </p>
         </div>
         <NewClientDialog
@@ -54,6 +79,15 @@ export function ClientsListView({
           className="pl-9"
         />
       </div>
+
+      {busca.trim() && haMaisParaCarregar ? (
+        <Alert>
+          <AlertDescription>
+            A busca considera só os {clients.length} clientes já carregados.
+            Carregue mais abaixo para incluir o restante.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {filtrados.length === 0 ? (
         <Card className="border-dashed">
@@ -85,6 +119,18 @@ export function ClientsListView({
           ))}
         </ul>
       )}
+
+      {!busca.trim() && haMaisParaCarregar ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={handleCarregarMais}
+          disabled={carregandoMais}
+        >
+          {carregandoMais ? "Carregando..." : `Carregar mais (${totalCount - clients.length} restantes)`}
+        </Button>
+      ) : null}
     </div>
   );
 }

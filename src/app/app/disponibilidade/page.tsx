@@ -14,7 +14,9 @@ export default async function DisponibilidadePage() {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, antecedencia_minima_min, limite_dias_futuro, buffer_padrao_min")
+    .select(
+      "id, antecedencia_minima_min, limite_dias_futuro, buffer_padrao_min, cancelamento_min_horas",
+    )
     .eq("profile_id", user!.id)
     .single();
 
@@ -48,6 +50,7 @@ export default async function DisponibilidadePage() {
         initialAntecedencia={business!.antecedencia_minima_min}
         initialLimiteDias={business!.limite_dias_futuro}
         initialBufferPadrao={business!.buffer_padrao_min}
+        initialCancelamentoMinHoras={business!.cancelamento_min_horas}
       />
 
       <ExceptionsCard businessId={business!.id} initialExceptions={exceptions ?? []} />

@@ -90,6 +90,19 @@ export function ClientInfoForm({
           ) : null}
         </div>
 
+        {/* Campo-armadilha contra bots: invisível para pessoas via CSS, mas
+            presente no DOM. Nunca deve ser preenchido por um usuário real. */}
+        <div className="absolute -left-[9999px]" aria-hidden="true">
+          <label htmlFor="empresa-honeypot">Não preencha este campo</label>
+          <input
+            id="empresa-honeypot"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            {...register("empresa")}
+          />
+        </div>
+
         <Button type="submit" className="w-full" disabled={submitting}>
           {submitting ? "Confirmando..." : "Confirmar agendamento"}
         </Button>
