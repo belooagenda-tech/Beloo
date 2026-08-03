@@ -103,13 +103,20 @@ async function sendProfessionalDayStartReminders(admin: ReturnType<typeof create
     if (jaEnviado) continue;
 
     const horario = formatInTimeZone(inicioPrimeiro, business.timezone, "HH:mm");
-    await notifyProfessional(admin, {
-      profileId: business.profile_id,
-      tipo: "lembrete_dia",
-      titulo: "Seu dia começa em breve",
-      corpo: `Seu primeiro atendimento hoje é às ${horario}.`,
-      url: "/app/agenda",
-    });
+    try {
+      await notifyProfessional(admin, {
+        profileId: business.profile_id,
+        tipo: "lembrete_dia",
+        titulo: "Seu dia começa em breve",
+        corpo: `Seu primeiro atendimento hoje é às ${horario}.`,
+        url: "/app/agenda",
+      });
+    } catch (err) {
+      // Uma falha pontual (ex.: push de um profissional) não pode abortar
+      // o loop e deixar os demais negócios sem lembrete nesse ciclo do cron.
+      console.error("Beloo: falha ao enviar lembrete de início de dia", business.id, err);
+      continue;
+    }
     enviados++;
   }
 

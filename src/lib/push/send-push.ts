@@ -11,10 +11,17 @@ export type PushPayload = {
 };
 
 let vapidConfigured = false;
+let avisouVapidAusente = false;
 
 function ensureVapidConfigured(): boolean {
   if (vapidConfigured) return true;
-  if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return false;
+  if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+    if (!avisouVapidAusente) {
+      console.error("Beloo: VAPID_PRIVATE_KEY/NEXT_PUBLIC_VAPID_PUBLIC_KEY não configuradas — push desativado.");
+      avisouVapidAusente = true;
+    }
+    return false;
+  }
 
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT ?? "mailto:contato@beloo.app",
@@ -48,6 +55,8 @@ async function sendToSubscriptions(
         const statusCode = (error as { statusCode?: number }).statusCode;
         if (statusCode === 404 || statusCode === 410) {
           expiredIds.push(sub.id);
+        } else {
+          console.error("Beloo: falha ao enviar push", statusCode, error);
         }
       }
     }),

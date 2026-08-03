@@ -15,13 +15,16 @@ export async function notifyProfessional(
     url?: string;
   },
 ) {
-  await admin.from("notifications").insert({
+  const { error } = await admin.from("notifications").insert({
     profile_id: params.profileId,
     tipo: params.tipo,
     titulo: params.titulo,
     corpo: params.corpo,
     appointment_id: params.appointmentId ?? null,
   });
+  if (error) {
+    console.error("Beloo: falha ao gravar notificação no sino", error);
+  }
 
   await sendPushToProfile(admin, params.profileId, {
     title: params.titulo,

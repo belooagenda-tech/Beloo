@@ -10,16 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Chamar /api/cron/reminders
+        if: always()
         run: |
           curl -sf -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_TARGET_URL }}/api/cron/reminders"
       - name: Chamar /api/cron/expire-entradas
+        if: always()
         run: |
           curl -sf -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_TARGET_URL }}/api/cron/expire-entradas"
       - name: Chamar /api/cron/plan-renewal-pix
+        if: always()
         run: |
           curl -sf -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \

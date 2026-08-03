@@ -13,6 +13,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const DESTINO_POR_TIPO: Record<Notification["tipo"], string> = {
+  novo_agendamento: "/app/agenda",
+  cancelamento: "/app/agenda",
+  entrada_paga: "/app/agenda",
+  lembrete_dia: "/app/agenda",
+  plano_pago: "/app/clientes",
+};
+
 function formatarRelativo(iso: string) {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutos = Math.round(diffMs / 60_000);
@@ -37,9 +45,7 @@ export function NotificationBell({ initialNotifications }: { initialNotification
       const supabase = createClient();
       await supabase.from("notifications").update({ lida: true }).eq("id", notification.id);
     }
-    if (notification.tipo === "novo_agendamento" || notification.tipo === "cancelamento") {
-      router.push("/app/agenda");
-    }
+    router.push(DESTINO_POR_TIPO[notification.tipo] ?? "/app/agenda");
   }
 
   async function marcarTodasComoLidas() {
