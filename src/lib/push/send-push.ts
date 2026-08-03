@@ -3,12 +3,6 @@ import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT ?? "mailto:contato@beloo.app",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "",
-  process.env.VAPID_PRIVATE_KEY ?? "",
-);
-
 export type PushPayload = {
   title: string;
   body: string;
@@ -16,13 +10,27 @@ export type PushPayload = {
   tag?: string;
 };
 
+let vapidConfigured = false;
+
+function ensureVapidConfigured(): boolean {
+  if (vapidConfigured) return true;
+  if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return false;
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT ?? "mailto:contato@beloo.app",
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  );
+  vapidConfigured = true;
+  return true;
+}
+
 async function sendToSubscriptions(
   admin: SupabaseClient<Database>,
   subscriptions: { id: string; endpoint: string; keys: Record<string, string> }[],
   payload: PushPayload,
 ) {
-  const configured = Boolean(process.env.VAPID_PRIVATE_KEY && process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
-  if (!configured || subscriptions.length === 0) return;
+  if (subscriptions.length === 0 || !ensureVapidConfigured()) return;
 
   const expiredIds: string[] = [];
 
