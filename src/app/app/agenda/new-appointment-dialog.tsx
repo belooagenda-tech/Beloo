@@ -9,7 +9,7 @@ import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPhoneBR, normalizePhone } from "@/lib/phone";
 import { manualAppointmentSchema, type ManualAppointmentInput } from "@/lib/validations/appointment";
-import { ClientPicker } from "./client-picker";
+import { ClientPicker } from "@/components/client-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

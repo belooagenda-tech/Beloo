@@ -7,19 +7,20 @@ import { formatPhoneBR, normalizePhone } from "@/lib/phone";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import type { AgendaClient } from "./types";
+
+export type PickedClient = { id: string; nome: string; telefone: string };
 
 export function ClientPicker({
   businessId,
   onSelect,
 }: {
   businessId: string;
-  onSelect: (client: AgendaClient) => void;
+  onSelect: (client: PickedClient) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<AgendaClient[]>([]);
+  const [results, setResults] = useState<PickedClient[]>([]);
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<AgendaClient | null>(null);
+  const [selected, setSelected] = useState<PickedClient | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export function ClientPicker({
     };
   }, [query, businessId]);
 
-  function handlePick(client: AgendaClient) {
+  function handlePick(client: PickedClient) {
     setSelected(client);
     setOpen(false);
     setQuery("");

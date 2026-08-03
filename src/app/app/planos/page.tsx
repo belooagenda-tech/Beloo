@@ -13,7 +13,7 @@ export default async function PlanosPage() {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id")
+    .select("id, slug")
     .eq("profile_id", user!.id)
     .single();
 
@@ -45,6 +45,7 @@ export default async function PlanosPage() {
 
       <PlansManager
         businessId={business!.id}
+        slug={business!.slug}
         services={services ?? []}
         initialPlans={plans ?? []}
         mpConnected={Boolean(mpConnection)}

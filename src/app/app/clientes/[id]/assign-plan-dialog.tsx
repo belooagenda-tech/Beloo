@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDays, formatISO } from "date-fns";
 import { toast } from "sonner";
-import { Check, Copy, Repeat } from "lucide-react";
+import { Repeat } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { normalizePhone } from "@/lib/phone";
 import { createPlanSubRequestAction } from "./plan-sub-actions";
+import { PlanPaymentLinkStep } from "@/components/plan-payment-link-step";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -29,44 +29,6 @@ import type { AvailablePlan } from "./types";
 
 function formatarPreco(preco: number) {
   return preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function LinkStep({ link, telefone, onDone }: { link: string; telefone: string; onDone: () => void }) {
-  const [copiado, setCopiado] = useState(false);
-  const telefoneNormalizado = normalizePhone(telefone);
-  const whatsappUrl = `https://wa.me/55${telefoneNormalizado}?text=${encodeURIComponent(
-    `Oi! Segue o link para assinar o plano: ${link}`,
-  )}`;
-
-  async function handleCopy() {
-    await navigator.clipboard.writeText(link);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
-  }
-
-  return (
-    <div className="space-y-4">
-      <Alert>
-        <AlertDescription>
-          Envie esse link para o cliente completar o pagamento e ativar o plano.
-        </AlertDescription>
-      </Alert>
-      <div className="flex items-center gap-2 rounded-md border border-border p-2">
-        <p className="flex-1 truncate text-sm text-muted-foreground">{link}</p>
-        <Button type="button" variant="ghost" size="icon" onClick={handleCopy} aria-label="Copiar link">
-          {copiado ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-        </Button>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Button nativeButton={false} render={<a href={whatsappUrl} target="_blank" rel="noreferrer" />}>
-          Enviar pelo WhatsApp
-        </Button>
-        <Button variant="outline" onClick={onDone}>
-          Concluir
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 function AssignPlanForm({
@@ -139,7 +101,7 @@ function AssignPlanForm({
   }
 
   if (link) {
-    return <LinkStep link={link} telefone={clientTelefone} onDone={handleDone} />;
+    return <PlanPaymentLinkStep link={link} telefone={clientTelefone} onDone={handleDone} />;
   }
 
   return (

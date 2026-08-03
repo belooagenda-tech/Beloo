@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PlanFormDialog } from "./plan-form-dialog";
+import { AssignPlanDialog } from "./assign-plan-dialog";
 import type { PlanListItem, PlanServiceLookup } from "./types";
 
 function formatarPreco(preco: number) {
@@ -26,11 +27,13 @@ function formatarPreco(preco: number) {
 
 export function PlansManager({
   businessId,
+  slug,
   services,
   initialPlans,
   mpConnected,
 }: {
   businessId: string;
+  slug: string;
   services: PlanServiceLookup[];
   initialPlans: PlanListItem[];
   mpConnected: boolean;
@@ -137,6 +140,9 @@ export function PlansManager({
                       </Badge>
                     ))}
                   </div>
+                  {plan.ativo ? (
+                    <AssignPlanDialog businessId={businessId} slug={slug} plan={plan} />
+                  ) : null}
                 </CardContent>
               </Card>
             </li>
