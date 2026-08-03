@@ -29,6 +29,8 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState<string | null>(null);
+  const [reenviando, setReenviando] = useState(false);
+  const [reenviado, setReenviado] = useState(false);
 
   async function handleAccountSubmit(values: AccountInput) {
     setSubmitting(true);
@@ -194,6 +196,14 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
   }
 
   if (needsEmailConfirmation) {
+    async function handleReenviar() {
+      if (!needsEmailConfirmation) return;
+      setReenviando(true);
+      await supabase.auth.resend({ type: "signup", email: needsEmailConfirmation });
+      setReenviando(false);
+      setReenviado(true);
+    }
+
     return (
       <div className="space-y-4 text-center">
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-secondary">
@@ -203,6 +213,19 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
           Enviamos um link de confirmação para <strong>{needsEmailConfirmation}</strong>.
           Abra seu e-mail e clique no link para continuar criando sua agenda.
         </p>
+        {reenviado ? (
+          <p className="text-sm font-medium text-success">E-mail reenviado.</p>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={handleReenviar}
+            disabled={reenviando}
+          >
+            {reenviando ? "Reenviando..." : "Não recebeu? Reenviar e-mail"}
+          </Button>
+        )}
         <Button
           variant="outline"
           className="w-full"

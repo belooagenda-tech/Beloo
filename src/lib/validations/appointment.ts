@@ -1,8 +1,12 @@
 import { z } from "zod";
+import { isValidBrazilianPhone } from "@/lib/phone";
 
 export const manualAppointmentSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome do cliente."),
-  telefone: z.string().trim().min(8, "Informe um telefone válido."),
+  telefone: z
+    .string()
+    .trim()
+    .refine(isValidBrazilianPhone, "Informe um telefone válido."),
   serviceId: z.string().min(1, "Escolha um serviço."),
   data: z.string().min(1, "Escolha a data."),
   hora: z.string().min(1, "Escolha o horário."),

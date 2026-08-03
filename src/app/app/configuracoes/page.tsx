@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 import { BusinessInfoCard } from "./business-info-card";
 import { PushNotificationsCard } from "./push-notifications-card";
+import { ChangePasswordCard } from "./change-password-card";
 
 export const metadata: Metadata = { title: "Configurações" };
 
@@ -57,6 +58,8 @@ export default async function ConfiguracoesPage() {
       />
 
       <PushNotificationsCard profileId={user!.id} />
+
+      <ChangePasswordCard />
     </div>
   );
 }

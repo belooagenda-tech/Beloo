@@ -1,11 +1,15 @@
 import { z } from "zod";
 import { CATEGORIAS } from "@/lib/constants";
+import { isValidBrazilianPhone } from "@/lib/phone";
 
 const categoriaValues = CATEGORIAS.map((c) => c.value) as [string, ...string[]];
 
 export const accountSchema = z.object({
   nome: z.string().trim().min(2, "Informe seu nome."),
-  telefone: z.string().trim().min(8, "Informe um telefone válido com DDD."),
+  telefone: z
+    .string()
+    .trim()
+    .refine(isValidBrazilianPhone, "Informe um telefone válido com DDD."),
   email: z.string().trim().email("Informe um e-mail válido."),
   senha: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres."),
 });

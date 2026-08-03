@@ -1,26 +1,11 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ClientProfile } from "./client-profile";
 import type { ActivePlan } from "./types";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}): Promise<Metadata> {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: client } = await supabase.from("clients").select("nome").eq("id", id).maybeSingle();
-  return { title: client ? client.nome : "Cliente" };
-}
-
-export default async function ClientDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+const getClientAndBusiness = cache(async (id: string) => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -38,6 +23,30 @@ export default async function ClientDetailPage({
     .eq("id", id)
     .eq("business_id", business!.id)
     .maybeSingle();
+
+  return { business, client };
+});
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const { client } = await getClientAndBusiness(id);
+  if (!client) notFound();
+
+  return { title: client.nome };
+}
+
+export default async function ClientDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { business, client } = await getClientAndBusiness(id);
 
   if (!client) notFound();
 

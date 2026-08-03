@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicBookingFlow } from "./public-booking-flow";
 
-async function getPublicBusiness(slug: string) {
+const getPublicBusiness = cache(async (slug: string) => {
   const supabase = createAdminClient();
   const { data: business } = await supabase
     .from("businesses")
@@ -21,7 +22,7 @@ async function getPublicBusiness(slug: string) {
     .order("created_at", { ascending: true });
 
   return { business, services: services ?? [] };
-}
+});
 
 export async function generateMetadata({
   params,
@@ -29,14 +30,10 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const supabase = createAdminClient();
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("nome_loja")
-    .eq("slug", slug)
-    .maybeSingle();
+  const data = await getPublicBusiness(slug);
+  if (!data) notFound();
 
-  return { title: business ? `Agendar com ${business.nome_loja}` : "Loja não encontrada" };
+  return { title: `Agendar com ${data.business.nome_loja}` };
 }
 
 export default async function PublicBookingPage({

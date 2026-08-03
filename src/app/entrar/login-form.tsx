@@ -15,6 +15,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [emailNaoConfirmado, setEmailNaoConfirmado] = useState<string | null>(null);
+  const [reenviando, setReenviando] = useState(false);
+  const [reenviado, setReenviado] = useState(false);
   const {
     register,
     handleSubmit,
@@ -23,6 +26,8 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
   async function onSubmit(values: LoginInput) {
     setServerError(null);
+    setEmailNaoConfirmado(null);
+    setReenviado(false);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({
       email: values.email,
@@ -30,6 +35,10 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     });
 
     if (error) {
+      if (error.message === "Email not confirmed") {
+        setEmailNaoConfirmado(values.email);
+        return;
+      }
       setServerError(
         error.message === "Invalid login credentials"
           ? "E-mail ou senha incorretos."
@@ -42,11 +51,44 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     router.refresh();
   }
 
+  async function handleReenviar() {
+    if (!emailNaoConfirmado) return;
+    setReenviando(true);
+    const supabase = createClient();
+    await supabase.auth.resend({ type: "signup", email: emailNaoConfirmado });
+    setReenviando(false);
+    setReenviado(true);
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       {serverError ? (
         <Alert variant="destructive">
           <AlertDescription>{serverError}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {emailNaoConfirmado ? (
+        <Alert>
+          <AlertDescription className="space-y-2">
+            <p>
+              Seu e-mail ainda não foi confirmado. Verifique sua caixa de
+              entrada ou reenvie o link de confirmação.
+            </p>
+            {reenviado ? (
+              <p className="text-sm font-medium text-success">E-mail reenviado.</p>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleReenviar}
+                disabled={reenviando}
+              >
+                {reenviando ? "Reenviando..." : "Reenviar e-mail de confirmação"}
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -65,7 +107,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="senha">Senha</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="senha">Senha</Label>
+          <Link href="/esqueci-senha" className="text-sm text-primary hover:underline">
+            Esqueceu a senha?
+          </Link>
+        </div>
         <Input
           id="senha"
           type="password"
