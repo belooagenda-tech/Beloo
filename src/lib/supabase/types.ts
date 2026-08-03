@@ -1,9 +1,12 @@
 export type AppointmentStatus =
+  | "aguardando_pagamento"
   | "agendado"
   | "confirmado"
   | "concluido"
   | "cancelado"
   | "nao_compareceu";
+
+export type EntradaStatus = "nao_aplicavel" | "pendente" | "pago" | "reembolsado" | "expirado";
 
 export type FormaPagamento = "dinheiro" | "pix" | "debito" | "credito" | "plano";
 
@@ -32,7 +35,21 @@ export type Business = {
   limite_dias_futuro: number;
   cancelamento_min_horas: number;
   buffer_padrao_min: number;
+  entrada_ativa: boolean;
+  entrada_percentual: number;
   created_at: string;
+};
+
+export type MpConnection = {
+  business_id: string;
+  mp_user_id: string;
+  mp_email: string | null;
+  access_token: string;
+  refresh_token: string;
+  public_key: string | null;
+  token_expires_at: string | null;
+  connected_at: string;
+  updated_at: string;
 };
 
 export type BusinessHour = {
@@ -106,9 +123,18 @@ export type Appointment = {
   observacoes: string | null;
   created_at: string;
   client_reminder_sent_at: string | null;
+  entrada_status: EntradaStatus;
+  entrada_valor: number | null;
+  entrada_expira_em: string | null;
+  mp_payment_id: string | null;
+  mp_preference_id: string | null;
 };
 
-export type NotificationTipo = "novo_agendamento" | "cancelamento" | "lembrete_dia";
+export type NotificationTipo =
+  | "novo_agendamento"
+  | "cancelamento"
+  | "lembrete_dia"
+  | "entrada_paga";
 
 export type Notification = {
   id: string;
@@ -167,6 +193,7 @@ export type Database = {
       client_plan_subs: Table<ClientPlanSub>;
       appointments: Table<Appointment>;
       appointment_payments: Table<AppointmentPayment>;
+      mp_connections: Table<MpConnection>;
       push_subscriptions: Table<PushSubscriptionRow>;
       saas_plans: Table<SaasPlan>;
       notifications: Table<Notification>;

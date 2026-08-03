@@ -5,6 +5,8 @@ export type PublicBusiness = {
   categoria: string | null;
   logo_url: string | null;
   timezone: string;
+  entrada_ativa: boolean;
+  entrada_percentual: number;
 };
 
 export type PublicService = {

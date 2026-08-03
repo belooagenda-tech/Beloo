@@ -41,6 +41,19 @@ export const OPCOES_CANCELAMENTO = [
   { valor: 72, label: "Até 72 horas antes" },
 ] as const;
 
+export const OPCOES_ENTRADA_PERCENTUAL = [
+  { valor: 10, label: "10%" },
+  { valor: 20, label: "20%" },
+  { valor: 30, label: "30%" },
+  { valor: 40, label: "40%" },
+  { valor: 50, label: "50%" },
+  { valor: 100, label: "100% (valor integral)" },
+] as const;
+
+// Tempo que um agendamento fica reservado aguardando o pagamento da entrada
+// antes de ser liberado automaticamente (ver /api/cron/expire-entradas).
+export const ENTRADA_EXPIRACAO_MINUTOS = 30;
+
 // Precisa ficar em sincronia com a checagem em is_slug_available() /
 // slug_not_reserved (supabase/migrations/20260731000006_reserved_slugs.sql).
 export const SLUGS_RESERVADOS = [

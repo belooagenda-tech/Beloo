@@ -8,7 +8,7 @@ const getPublicBusiness = cache(async (slug: string) => {
   const supabase = createAdminClient();
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, nome_loja, slug, categoria, logo_url, timezone")
+    .select("id, nome_loja, slug, categoria, logo_url, timezone, entrada_ativa, entrada_percentual")
     .eq("slug", slug)
     .maybeSingle();
 

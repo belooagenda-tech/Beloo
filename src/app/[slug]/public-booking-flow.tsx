@@ -67,8 +67,18 @@ export function PublicBookingFlow({
       return;
     }
 
+    if (result.pagamentoUrl) {
+      window.location.href = result.pagamentoUrl;
+      return;
+    }
+
     router.push(`/${business.slug}/confirmacao?a=${result.appointmentId}`);
   }
+
+  const entradaValor =
+    business.entrada_ativa && business.entrada_percentual > 0 && selectedService
+      ? Math.round(selectedService.preco * business.entrada_percentual) / 100
+      : undefined;
 
   return (
     <div className="flex min-h-screen flex-col bg-linear-to-b from-secondary/60 via-background to-background">
@@ -124,6 +134,7 @@ export function PublicBookingFlow({
               service={selectedService}
               inicioISO={selectedIso}
               timezone={business.timezone}
+              entradaValor={entradaValor}
               onSubmit={handleSubmit}
               onBack={() => setStep("horario")}
               submitting={submitting}

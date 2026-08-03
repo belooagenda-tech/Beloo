@@ -21,6 +21,7 @@ import type {
 } from "./types";
 
 const STATUS_META: Record<AppointmentStatus, { label: string; className: string }> = {
+  aguardando_pagamento: { label: "Aguardando pagamento", className: "bg-warning/15 text-warning" },
   agendado: { label: "Agendado", className: "bg-muted text-muted-foreground" },
   confirmado: { label: "Confirmado", className: "bg-secondary text-secondary-foreground" },
   concluido: { label: "Concluído", className: "bg-success/15 text-success" },

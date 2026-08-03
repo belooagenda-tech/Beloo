@@ -14,3 +14,8 @@ jobs:
           curl -sf -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_TARGET_URL }}/api/cron/reminders"
+      - name: Chamar /api/cron/expire-entradas
+        run: |
+          curl -sf -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_TARGET_URL }}/api/cron/expire-entradas"

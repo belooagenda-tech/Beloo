@@ -20,6 +20,7 @@ export function ClientInfoForm({
   service,
   inicioISO,
   timezone,
+  entradaValor,
   onSubmit,
   onBack,
   submitting,
@@ -28,6 +29,7 @@ export function ClientInfoForm({
   service: PublicService;
   inicioISO: string;
   timezone: string;
+  entradaValor?: number;
   onSubmit: (values: ClientInfoInput) => void;
   onBack: () => void;
   submitting: boolean;
@@ -59,6 +61,12 @@ export function ClientInfoForm({
           <p className="text-sm text-muted-foreground capitalize">
             {dataFormatada} às {horaFormatada} · {formatarPreco(service.preco)}
           </p>
+          {entradaValor ? (
+            <p className="mt-2 text-sm font-medium text-primary">
+              Entrada de {formatarPreco(entradaValor)} para confirmar · restante{" "}
+              {formatarPreco(service.preco - entradaValor)} no dia
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -104,7 +112,11 @@ export function ClientInfoForm({
         </div>
 
         <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? "Confirmando..." : "Confirmar agendamento"}
+          {submitting
+            ? "Aguarde..."
+            : entradaValor
+              ? "Ir para pagamento"
+              : "Confirmar agendamento"}
         </Button>
       </form>
     </div>

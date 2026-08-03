@@ -7,6 +7,9 @@ import { getAvailableSlotsForService } from "@/lib/booking/get-available-slots";
 import { normalizePhone, isValidBrazilianPhone } from "@/lib/phone";
 import { clientInfoSchema } from "@/lib/validations/public-booking";
 import { notifyProfessional } from "@/lib/push/notify";
+import { ENTRADA_EXPIRACAO_MINUTOS } from "@/lib/constants";
+import { getValidAccessToken } from "@/lib/mercadopago/connection";
+import { createPreference, refundPayment } from "@/lib/mercadopago/client";
 import type { AppointmentStatus } from "@/lib/supabase/types";
 
 export async function getAvailableSlotsAction(
@@ -27,7 +30,7 @@ export async function getAvailableSlotsAction(
 }
 
 export type CreateAppointmentResult =
-  | { ok: true; appointmentId: string }
+  | { ok: true; appointmentId: string; pagamentoUrl?: string }
   | { ok: false; error: string };
 
 const MAX_AGENDAMENTOS_FUTUROS_POR_CLIENTE = 6;
@@ -55,14 +58,14 @@ export async function createAppointmentAction(input: {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, profile_id, timezone")
+    .select("id, profile_id, timezone, entrada_ativa, entrada_percentual")
     .eq("slug", input.slug)
     .maybeSingle();
   if (!business) return { ok: false, error: "Loja não encontrada." };
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, nome, duracao_min, ativo")
+    .select("id, nome, duracao_min, preco, ativo")
     .eq("id", input.serviceId)
     .eq("business_id", business.id)
     .maybeSingle();
@@ -119,6 +122,23 @@ export async function createAppointmentAction(input: {
     }
   }
 
+  let entradaAccessToken: string | null = null;
+  const requerEntrada = business.entrada_ativa && business.entrada_percentual > 0;
+  if (requerEntrada) {
+    entradaAccessToken = await getValidAccessToken(supabase, business.id);
+    if (!entradaAccessToken) {
+      // Loja marcou entrada ativa mas a conexão do Mercado Pago sumiu (ex.:
+      // token revogado externamente) — não trava o cliente, só segue sem
+      // cobrar entrada e avisa no log do servidor para o time investigar.
+      console.error(`Beloo: entrada ativa sem conexão MP válida para business ${business.id}`);
+    }
+  }
+  const cobrarEntrada = requerEntrada && entradaAccessToken;
+
+  const entradaValor = cobrarEntrada
+    ? Math.round(service.preco * business.entrada_percentual) / 100
+    : null;
+
   const { data: appointment, error: appointmentError } = await supabase
     .from("appointments")
     .insert({
@@ -127,7 +147,12 @@ export async function createAppointmentAction(input: {
       service_id: service.id,
       inicio: inicio.toISOString(),
       fim: fim.toISOString(),
-      status: "agendado",
+      status: cobrarEntrada ? "aguardando_pagamento" : "agendado",
+      entrada_status: cobrarEntrada ? "pendente" : "nao_aplicavel",
+      entrada_valor: entradaValor,
+      entrada_expira_em: cobrarEntrada
+        ? addMinutes(new Date(), ENTRADA_EXPIRACAO_MINUTOS).toISOString()
+        : null,
     })
     .select("id")
     .single();
@@ -140,6 +165,37 @@ export async function createAppointmentAction(input: {
           ? "Esse horário acabou de ser preenchido por outro cliente. Escolha outro horário."
           : "Não foi possível concluir o agendamento. Tente novamente.",
     };
+  }
+
+  if (cobrarEntrada && entradaAccessToken && entradaValor) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+    try {
+      const preference = await createPreference(entradaAccessToken, {
+        title: `Entrada — ${service.nome}`,
+        amount: entradaValor,
+        externalReference: appointment.id,
+        successUrl: `${siteUrl}/${input.slug}/confirmacao?a=${appointment.id}`,
+        failureUrl: `${siteUrl}/${input.slug}?pagamento=falhou`,
+        pendingUrl: `${siteUrl}/${input.slug}/confirmacao?a=${appointment.id}`,
+        notificationUrl: `${siteUrl}/api/webhooks/mercadopago?appointment=${appointment.id}`,
+      });
+
+      await supabase
+        .from("appointments")
+        .update({ mp_preference_id: preference.id })
+        .eq("id", appointment.id);
+
+      return { ok: true, appointmentId: appointment.id, pagamentoUrl: preference.initPoint };
+    } catch (err) {
+      console.error("Beloo: falha ao criar preferência Mercado Pago", err);
+      // Libera o horário — sem link de pagamento não há como o cliente
+      // confirmar esse agendamento.
+      await supabase.from("appointments").delete().eq("id", appointment.id);
+      return {
+        ok: false,
+        error: "Não foi possível iniciar o pagamento da entrada. Tente novamente.",
+      };
+    }
   }
 
   const horario = formatInTimeZone(inicio, business.timezone, "dd/MM 'às' HH:mm");
@@ -246,7 +302,7 @@ export async function cancelAppointmentAction(
 
   const { data: appointment } = await supabase
     .from("appointments")
-    .select("id, client_id, service_id, inicio, status")
+    .select("id, client_id, service_id, inicio, status, entrada_status, mp_payment_id")
     .eq("id", appointmentId)
     .eq("business_id", business.id)
     .maybeSingle();
@@ -281,6 +337,22 @@ export async function cancelAppointmentAction(
     return { ok: false, error: "Não foi possível cancelar. Tente novamente." };
   }
 
+  let avisoReembolso = "";
+  if (appointment.entrada_status === "pago" && appointment.mp_payment_id) {
+    try {
+      const accessToken = await getValidAccessToken(supabase, business.id);
+      if (!accessToken) throw new Error("sem conexão Mercado Pago");
+      await refundPayment(accessToken, appointment.mp_payment_id);
+      await supabase
+        .from("appointments")
+        .update({ entrada_status: "reembolsado" })
+        .eq("id", appointmentId);
+    } catch (err) {
+      console.error("Beloo: falha ao reembolsar entrada automaticamente", err);
+      avisoReembolso = " O reembolso automático da entrada falhou — verifique manualmente no Mercado Pago.";
+    }
+  }
+
   const { data: service } = await supabase
     .from("services")
     .select("nome")
@@ -293,7 +365,7 @@ export async function cancelAppointmentAction(
       profileId: business.profile_id,
       tipo: "cancelamento",
       titulo: "Agendamento cancelado",
-      corpo: `${client.nome} cancelou ${service?.nome ?? "um atendimento"} de ${horario}.`,
+      corpo: `${client.nome} cancelou ${service?.nome ?? "um atendimento"} de ${horario}.${avisoReembolso}`,
       appointmentId: appointment.id,
       url: "/app/agenda",
     });

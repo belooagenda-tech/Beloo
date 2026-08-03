@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 import { BusinessInfoCard } from "./business-info-card";
 import { PushNotificationsCard } from "./push-notifications-card";
 import { ChangePasswordCard } from "./change-password-card";
+import { MercadoPagoCard } from "./mercadopago-card";
 import { DangerZoneCard } from "./danger-zone-card";
 
 export const metadata: Metadata = { title: "Configurações" };
@@ -17,9 +20,16 @@ export default async function ConfiguracoesPage() {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, nome_loja, categoria, slug")
+    .select("id, nome_loja, categoria, slug, entrada_ativa, entrada_percentual")
     .eq("profile_id", user!.id)
     .single();
+
+  const admin = createAdminClient();
+  const { data: mpConnection } = await admin
+    .from("mp_connections")
+    .select("mp_email")
+    .eq("business_id", business!.id)
+    .maybeSingle();
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const publicUrl = `${siteUrl}/${business!.slug}`;
@@ -59,6 +69,15 @@ export default async function ConfiguracoesPage() {
       />
 
       <PushNotificationsCard profileId={user!.id} />
+
+      <Suspense fallback={null}>
+        <MercadoPagoCard
+          connected={Boolean(mpConnection)}
+          mpEmail={mpConnection?.mp_email ?? null}
+          initialEntradaAtiva={business!.entrada_ativa}
+          initialEntradaPercentual={business!.entrada_percentual}
+        />
+      </Suspense>
 
       <ChangePasswordCard />
 
