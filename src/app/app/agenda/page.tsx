@@ -61,6 +61,7 @@ export default async function AgendaPage({
 
   return (
     <AgendaDayView
+      key={dataSelecionada}
       businessId={business!.id}
       timezone={business!.timezone}
       bufferPadrao={business!.buffer_padrao_min}

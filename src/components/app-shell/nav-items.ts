@@ -28,3 +28,15 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/app/configuracoes", label: "Configurações", icon: Settings },
   { href: "/app/assinatura", label: "Assinatura", icon: Sparkles },
 ];
+
+// No celular, a barra inferior só tem espaço pra poucos atalhos — os mais
+// usados no dia a dia ficam fixos, o resto entra no menu "Mais".
+const PRIMARY_MOBILE_HREFS = ["/app", "/app/agenda", "/app/clientes", "/app/financeiro"];
+
+export const PRIMARY_MOBILE_NAV_ITEMS = NAV_ITEMS.filter((item) =>
+  PRIMARY_MOBILE_HREFS.includes(item.href),
+);
+
+export const SECONDARY_MOBILE_NAV_ITEMS = NAV_ITEMS.filter(
+  (item) => !PRIMARY_MOBILE_HREFS.includes(item.href),
+);

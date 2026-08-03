@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, capitalizeFirst } from "@/lib/utils";
 
 function formatarRotuloDia(dateStr: string) {
   const [ano, mes, dia] = dateStr.split("-").map(Number);
@@ -14,7 +14,7 @@ function formatarRotuloDia(dateStr: string) {
     day: "numeric",
     month: "short",
   }).format(data);
-  return formatado.replace(".", "");
+  return capitalizeFirst(formatado.replace(/\./g, ""));
 }
 
 export function DayTimePicker({
@@ -62,7 +62,7 @@ export function DayTimePicker({
                 type="button"
                 onClick={() => setManuallySelectedDate(date)}
                 className={cn(
-                  "shrink-0 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors",
+                  "shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
                   date === selectedDate
                     ? "border-primary bg-secondary text-secondary-foreground"
                     : "border-border bg-card text-foreground hover:border-primary/40",

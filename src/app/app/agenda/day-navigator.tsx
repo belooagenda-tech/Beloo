@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { capitalizeFirst } from "@/lib/utils";
 
 function addDiasStr(dataStr: string, dias: number) {
   const [ano, mes, dia] = dataStr.split("-").map(Number);
@@ -28,11 +29,13 @@ export function DayNavigator({
   }
 
   const [ano, mes, dia] = dataSelecionada.split("-").map(Number);
-  const label = new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(new Date(ano, mes - 1, dia));
+  const label = capitalizeFirst(
+    new Intl.DateTimeFormat("pt-BR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(new Date(ano, mes - 1, dia)),
+  );
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -55,7 +58,7 @@ export function DayNavigator({
         >
           <ChevronRight className="size-4" />
         </Button>
-        <p className="ml-1 text-sm font-medium capitalize text-foreground">{label}</p>
+        <p className="ml-1 text-sm font-medium text-foreground">{label}</p>
       </div>
       <div className="flex items-center gap-2">
         {dataSelecionada !== hojeStr ? (

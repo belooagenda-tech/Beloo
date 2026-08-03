@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ClientPushOptIn } from "@/components/client-push-opt-in";
 import { subscribeClientPushByAppointmentAction } from "../actions";
+import { capitalizeFirst } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Agendamento confirmado" };
 
@@ -53,11 +54,13 @@ export default async function ConfirmacaoPage({
   if (!data) notFound();
 
   const { business, service, client, appointment } = data;
-  const dataFormatada = new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(new Date(appointment.inicio));
+  const dataFormatada = capitalizeFirst(
+    new Intl.DateTimeFormat("pt-BR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(new Date(appointment.inicio)),
+  );
   const horaFormatada = formatInTimeZone(new Date(appointment.inicio), business.timezone, "HH:mm");
 
   const aguardandoPagamento = appointment.status === "aguardando_pagamento";
@@ -101,7 +104,7 @@ export default async function ConfirmacaoPage({
                 <p className="text-sm text-muted-foreground">
                   {service?.nome} com <strong>{business.nome_loja}</strong>
                 </p>
-                <p className="text-sm font-medium capitalize text-foreground">
+                <p className="text-sm font-medium text-foreground">
                   {dataFormatada} às {horaFormatada}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -127,7 +130,7 @@ export default async function ConfirmacaoPage({
                 <p className="text-sm text-muted-foreground">
                   {service?.nome} com <strong>{business.nome_loja}</strong>
                 </p>
-                <p className="text-sm font-medium capitalize text-foreground">
+                <p className="text-sm font-medium text-foreground">
                   {dataFormatada} às {horaFormatada}
                 </p>
                 <ClientPushOptIn

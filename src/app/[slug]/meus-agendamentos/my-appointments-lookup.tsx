@@ -11,6 +11,7 @@ import {
   type PublicAppointmentSummary,
 } from "../actions";
 import { ClientPushOptIn } from "@/components/client-push-opt-in";
+import { capitalizeFirst } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,12 +114,14 @@ export function MyAppointmentsLookup({ slug, timezone }: { slug: string; timezon
                         <p className="text-sm font-medium text-foreground">
                           {agendamento.servicoNome}
                         </p>
-                        <p className="text-sm text-muted-foreground capitalize">
-                          {new Intl.DateTimeFormat("pt-BR", {
-                            weekday: "short",
-                            day: "2-digit",
-                            month: "2-digit",
-                          }).format(new Date(agendamento.inicio))}{" "}
+                        <p className="text-sm text-muted-foreground">
+                          {capitalizeFirst(
+                            new Intl.DateTimeFormat("pt-BR", {
+                              weekday: "short",
+                              day: "2-digit",
+                              month: "2-digit",
+                            }).format(new Date(agendamento.inicio)),
+                          )}{" "}
                           às {formatInTimeZone(new Date(agendamento.inicio), timezone, "HH:mm")}
                         </p>
                       </div>

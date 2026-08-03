@@ -8,6 +8,7 @@ import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { clientInfoSchema, type ClientInfoInput } from "@/lib/validations/public-booking";
 import { isValidBrazilianPhone } from "@/lib/phone";
 import { findClientNameByPhoneAction } from "./actions";
+import { capitalizeFirst } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,11 +80,13 @@ export function ClientInfoForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [telefone, slug]);
 
-  const dataFormatada = new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(new Date(inicioISO));
+  const dataFormatada = capitalizeFirst(
+    new Intl.DateTimeFormat("pt-BR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(new Date(inicioISO)),
+  );
   const horaFormatada = formatInTimeZone(new Date(inicioISO), timezone, "HH:mm");
 
   return (
@@ -96,7 +99,7 @@ export function ClientInfoForm({
       <Card>
         <CardContent className="py-4">
           <p className="text-sm font-medium text-foreground">{service.nome}</p>
-          <p className="text-sm text-muted-foreground capitalize">
+          <p className="text-sm text-muted-foreground">
             {dataFormatada} às {horaFormatada} · {formatarPreco(service.preco)}
           </p>
           {entradaValor ? (

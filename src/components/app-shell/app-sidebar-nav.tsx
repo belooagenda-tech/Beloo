@@ -11,7 +11,7 @@ export function AppSidebarNav() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="flex gap-1 overflow-x-auto border-b border-border bg-card px-3 py-2 md:w-56 md:shrink-0 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-3"
+      className="hidden md:flex md:w-56 md:shrink-0 md:flex-col md:gap-1 md:border-r md:border-border md:bg-card md:p-3"
     >
       {NAV_ITEMS.map((item) => {
         const active = item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LogoMark } from "@/components/brand/logo";
 import type { Notification } from "@/lib/supabase/types";
 import { AppSidebarNav } from "./app-sidebar-nav";
+import { MobileBottomNav } from "./mobile-bottom-nav";
 import { SignOutButton } from "./sign-out-button";
 import { NotificationBell } from "./notification-bell";
 
@@ -31,8 +32,9 @@ export function AppShell({
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
         <AppSidebarNav />
-        <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
+        <main className="flex-1 px-4 py-6 pb-20 sm:px-6 md:pb-6">{children}</main>
       </div>
+      <MobileBottomNav />
     </div>
   );
 }
