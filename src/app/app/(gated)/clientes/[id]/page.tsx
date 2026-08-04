@@ -2,20 +2,13 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getOwnBusiness } from "@/lib/supabase/session";
 import { ClientProfile } from "./client-profile";
 import type { ActivePlan, PlanPaymentHistoryItem } from "./types";
 
 const getClientAndBusiness = cache(async (id: string) => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, timezone, slug")
-    .eq("profile_id", user!.id)
-    .single();
+  const business = await getOwnBusiness();
 
   const { data: client } = await supabase
     .from("clients")

@@ -3,17 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "./nav-items";
+import { getNavItems } from "./nav-items";
 
-export function AppSidebarNav() {
+export function AppSidebarNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const items = getNavItems(isAdmin);
 
   return (
     <nav
       aria-label="Navegação principal"
       className="hidden md:flex md:w-56 md:shrink-0 md:flex-col md:gap-1 md:border-r md:border-border md:bg-card md:p-3"
     >
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active = item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);
         const Icon = item.icon;
         return (

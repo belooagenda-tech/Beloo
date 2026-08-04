@@ -1,20 +1,13 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getOwnBusiness } from "@/lib/supabase/session";
 import { ServicesManager } from "./services-manager";
 
 export const metadata: Metadata = { title: "Serviços" };
 
 export default async function ServicosPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, buffer_padrao_min")
-    .eq("profile_id", user!.id)
-    .single();
+  const business = await getOwnBusiness();
 
   const { data: services } = await supabase
     .from("services")

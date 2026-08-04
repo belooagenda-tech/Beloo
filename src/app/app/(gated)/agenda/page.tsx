@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/server";
+import { getOwnBusiness } from "@/lib/supabase/session";
 import { AgendaDayView } from "./agenda-day-view";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -12,15 +13,7 @@ export default async function AgendaPage({
   searchParams: Promise<{ data?: string }>;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, timezone, buffer_padrao_min")
-    .eq("profile_id", user!.id)
-    .single();
+  const business = await getOwnBusiness();
 
   const { data: dataParam } = await searchParams;
   const hojeStr = formatInTimeZone(new Date(), business!.timezone, "yyyy-MM-dd");

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getOwnBusiness, getOwnProfile } from "@/lib/supabase/session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
@@ -11,18 +12,7 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const [{ data: profile }, { data: business }] = await Promise.all([
-    supabase.from("profiles").select("nome").eq("id", user!.id).maybeSingle(),
-    supabase
-      .from("businesses")
-      .select("id, nome_loja, slug")
-      .eq("profile_id", user!.id)
-      .maybeSingle(),
-  ]);
+  const [profile, business] = await Promise.all([getOwnProfile(), getOwnBusiness()]);
 
   const [{ count: servicosCount }, { count: horariosCount }, { count: clientesCount }] =
     await Promise.all([

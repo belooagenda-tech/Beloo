@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { formatInTimeZone } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/client";
@@ -38,9 +38,12 @@ export function AgendaDayView({
   const [paymentTarget, setPaymentTarget] = useState<AgendaAppointment | null>(null);
   const [paymentFormKey, setPaymentFormKey] = useState(0);
 
-  const servicesById = new Map(services.map((s) => [s.id, s]));
-  const clientsById = new Map(clients.map((c) => [c.id, c]));
-  const paymentsByAppointment = new Map(payments.map((p) => [p.appointment_id, p]));
+  const servicesById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
+  const clientsById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
+  const paymentsByAppointment = useMemo(
+    () => new Map(payments.map((p) => [p.appointment_id, p])),
+    [payments],
+  );
 
   async function updateStatus(id: string, status: AgendaAppointment["status"]) {
     const supabase = createClient();

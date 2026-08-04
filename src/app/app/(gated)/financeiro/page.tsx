@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
+import { getOwnBusiness } from "@/lib/supabase/session";
 import { normalizarPeriodo, resolvePeriodo } from "./period";
 import { aggregateByFormaPagamento, aggregateByService, bucketByPeriod } from "./aggregate";
 import { PeriodFilter } from "./period-filter";
-import { RevenueByPeriodChart } from "./charts/revenue-by-period-chart";
-import { RevenueByServiceChart } from "./charts/revenue-by-service-chart";
-import { RevenueByPaymentMethodChart } from "./charts/revenue-by-payment-method-chart";
 import { ExpiringPlans } from "./expiring-plans";
+
+// recharts é uma dependência pesada — carregar sob demanda mantém o bundle
+// inicial das outras rotas de /app livre desse peso.
+const RevenueByPeriodChart = dynamic(() =>
+  import("./charts/revenue-by-period-chart").then((mod) => mod.RevenueByPeriodChart),
+);
+const RevenueByServiceChart = dynamic(() =>
+  import("./charts/revenue-by-service-chart").then((mod) => mod.RevenueByServiceChart),
+);
+const RevenueByPaymentMethodChart = dynamic(() =>
+  import("./charts/revenue-by-payment-method-chart").then((mod) => mod.RevenueByPaymentMethodChart),
+);
 import { Card, CardContent } from "@/components/ui/card";
 import type { ExpiringPlan, FinancePayment } from "./types";
 
@@ -31,15 +42,7 @@ export default async function FinanceiroPage({
   searchParams: Promise<{ periodo?: string }>;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, timezone")
-    .eq("profile_id", user!.id)
-    .single();
+  const business = await getOwnBusiness();
 
   const { periodo: periodoParam } = await searchParams;
   const periodo = normalizarPeriodo(periodoParam);

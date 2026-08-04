@@ -1,28 +1,23 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthedUser, getOwnBusiness, getOwnProfile } from "@/lib/supabase/session";
 import { AppShell } from "@/components/app-shell/app-shell";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthedUser();
 
   if (!user) {
     redirect("/entrar");
   }
 
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("nome_loja")
-    .eq("profile_id", user.id)
-    .maybeSingle();
+  const [business, profile] = await Promise.all([getOwnBusiness(), getOwnProfile()]);
 
   if (!business) {
     redirect("/criar-agenda");
   }
 
+  const supabase = await createClient();
   const { data: notifications } = await supabase
     .from("notifications")
     .select("id, profile_id, tipo, titulo, corpo, appointment_id, lida, created_at")
@@ -31,7 +26,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     .limit(20);
 
   return (
-    <AppShell nomeLoja={business.nome_loja} notifications={notifications ?? []}>
+    <AppShell
+      nomeLoja={business.nome_loja}
+      notifications={notifications ?? []}
+      isAdmin={profile?.is_admin ?? false}
+    >
       {children}
     </AppShell>
   );

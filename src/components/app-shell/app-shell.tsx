@@ -10,10 +10,12 @@ import { NotificationBell } from "./notification-bell";
 export function AppShell({
   nomeLoja,
   notifications,
+  isAdmin = false,
   children,
 }: {
   nomeLoja: string;
   notifications: Notification[];
+  isAdmin?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -31,10 +33,10 @@ export function AppShell({
         </div>
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
-        <AppSidebarNav />
+        <AppSidebarNav isAdmin={isAdmin} />
         <main className="flex-1 px-4 py-6 pb-20 sm:px-6 md:pb-6">{children}</main>
       </div>
-      <MobileBottomNav />
+      <MobileBottomNav isAdmin={isAdmin} />
     </div>
   );
 }

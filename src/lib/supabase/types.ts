@@ -20,6 +20,7 @@ export type Profile = {
   telefone: string | null;
   email: string | null;
   avatar_url: string | null;
+  is_admin: boolean;
   created_at: string;
 };
 
@@ -199,6 +200,26 @@ export type SaasPlan = {
   id: string;
   nome: string;
   status: string;
+  valor_mensal: number;
+  trial_dias: number;
+  billing_enabled: boolean;
+  billing_enabled_at: string | null;
+  updated_at: string;
+};
+
+export type SaasSubscriptionStatus = "trial" | "ativo" | "atrasado" | "cancelado";
+
+export type SaasSubscription = {
+  id: string;
+  business_id: string;
+  status: SaasSubscriptionStatus;
+  trial_ends_at: string;
+  current_period_end: string | null;
+  mp_preapproval_id: string | null;
+  mp_preapproval_status: string | null;
+  charged_quantity_processed: number;
+  created_at: string;
+  updated_at: string;
 };
 
 type Table<Row> = {
@@ -225,6 +246,7 @@ export type Database = {
       mp_connections: Table<MpConnection>;
       push_subscriptions: Table<PushSubscriptionRow>;
       saas_plans: Table<SaasPlan>;
+      saas_subscriptions: Table<SaasSubscription>;
       notifications: Table<Notification>;
     };
     Views: Record<string, never>;

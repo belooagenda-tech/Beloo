@@ -11,6 +11,18 @@ function credentials() {
   return { clientId, clientSecret };
 }
 
+// Access token fixo da conta do DONO da Beloo — usado só para cobrar a
+// assinatura da própria plataforma dos profissionais (diferente do fluxo
+// Connect acima, onde cada profissional conecta a própria conta MP para
+// receber dos próprios clientes).
+export function platformAccessToken(): string {
+  const token = process.env.MERCADO_PAGO_PLATFORM_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error("MERCADO_PAGO_PLATFORM_ACCESS_TOKEN não configurado.");
+  }
+  return token;
+}
+
 function redirectUri() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   if (!siteUrl) throw new Error("NEXT_PUBLIC_SITE_URL não configurado.");

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthedUser, getOwnBusiness } from "@/lib/supabase/session";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 import { BusinessInfoCard } from "./business-info-card";
@@ -13,16 +13,7 @@ import { DangerZoneCard } from "./danger-zone-card";
 export const metadata: Metadata = { title: "Configurações" };
 
 export default async function ConfiguracoesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, nome_loja, categoria, slug, entrada_ativa, entrada_percentual")
-    .eq("profile_id", user!.id)
-    .single();
+  const [user, business] = await Promise.all([getAuthedUser(), getOwnBusiness()]);
 
   const admin = createAdminClient();
   const { data: mpConnection } = await admin

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { addDays, formatISO } from "date-fns";
+import { addDays, addMonths, formatISO } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSignature } from "@/lib/mercadopago/webhook-signature";
-import { getPayment, getPreapproval } from "@/lib/mercadopago/client";
+import { getPayment, getPreapproval, platformAccessToken } from "@/lib/mercadopago/client";
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { notifyProfessional } from "@/lib/push/notify";
 import type { Database } from "@/lib/supabase/types";
@@ -155,7 +155,7 @@ async function handlePreapprovalNotification(admin: Admin, preapprovalId: string
     .select("id, plan_id, pagamento_status, data_renovacao")
     .eq("mp_preapproval_id", preapprovalId)
     .maybeSingle();
-  if (!sub) return NextResponse.json({ ok: true });
+  if (!sub) return handleSaasPreapprovalNotification(admin, preapprovalId);
 
   const { data: plan } = await admin
     .from("client_plans")
@@ -244,6 +244,52 @@ async function handlePreapprovalNotification(admin: Admin, preapprovalId: string
       }
     }
   }
+
+  return NextResponse.json({ ok: true });
+}
+
+// Assinatura da própria Beloo (o profissional pagando a plataforma) — mesmo
+// preapproval do Mercado Pago acima, mas cobrado com o access token fixo do
+// dono, não com o token OAuth de uma conta conectada. Chega neste branch
+// quando o preapproval não é de nenhum client_plan_sub.
+async function handleSaasPreapprovalNotification(admin: Admin, preapprovalId: string) {
+  const { data: sub } = await admin
+    .from("saas_subscriptions")
+    .select("id, status, charged_quantity_processed")
+    .eq("mp_preapproval_id", preapprovalId)
+    .maybeSingle();
+  if (!sub) return NextResponse.json({ ok: true });
+
+  const preapproval = await getPreapproval(platformAccessToken(), preapprovalId).catch(() => null);
+  if (!preapproval) return new NextResponse("Preapproval lookup failed", { status: 400 });
+
+  await admin
+    .from("saas_subscriptions")
+    .update({ mp_preapproval_status: preapproval.status })
+    .eq("id", sub.id);
+
+  if (preapproval.status === "cancelled" || preapproval.status === "paused") {
+    await admin.from("saas_subscriptions").update({ status: "cancelado" }).eq("id", sub.id);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (preapproval.status !== "authorized") {
+    return NextResponse.json({ ok: true });
+  }
+
+  const chargedQuantity = preapproval.chargedQuantity ?? 0;
+  if (chargedQuantity <= sub.charged_quantity_processed) {
+    return NextResponse.json({ ok: true });
+  }
+
+  await admin
+    .from("saas_subscriptions")
+    .update({
+      status: "ativo",
+      current_period_end: addMonths(new Date(), 1).toISOString(),
+      charged_quantity_processed: chargedQuantity,
+    })
+    .eq("id", sub.id);
 
   return NextResponse.json({ ok: true });
 }

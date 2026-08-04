@@ -1,21 +1,14 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getOwnBusiness } from "@/lib/supabase/session";
 import { PlansManager } from "./plans-manager";
 
 export const metadata: Metadata = { title: "Planos" };
 
 export default async function PlanosPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, slug")
-    .eq("profile_id", user!.id)
-    .single();
+  const business = await getOwnBusiness();
 
   const admin = createAdminClient();
   const [{ data: services }, { data: plans }, { data: mpConnection }] = await Promise.all([

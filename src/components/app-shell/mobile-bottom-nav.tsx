@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PRIMARY_MOBILE_NAV_ITEMS, SECONDARY_MOBILE_NAV_ITEMS } from "./nav-items";
+import { PRIMARY_MOBILE_NAV_ITEMS, getSecondaryMobileNavItems } from "./nav-items";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,14 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function MobileBottomNav() {
+export function MobileBottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const secondaryItems = getSecondaryMobileNavItems(isAdmin);
 
   function isActive(href: string) {
     return href === "/app" ? pathname === "/app" : pathname.startsWith(href);
   }
 
-  const maisAtivo = SECONDARY_MOBILE_NAV_ITEMS.some((item) => isActive(item.href));
+  const maisAtivo = secondaryItems.some((item) => isActive(item.href));
 
   return (
     <nav
@@ -60,7 +61,7 @@ export function MobileBottomNav() {
           }
         />
         <DropdownMenuContent align="end" side="top" className="min-w-44">
-          {SECONDARY_MOBILE_NAV_ITEMS.map((item) => {
+          {secondaryItems.map((item) => {
             const Icon = item.icon;
             return (
               <DropdownMenuItem key={item.href} render={<Link href={item.href} />}>

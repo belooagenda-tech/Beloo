@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getOwnBusiness } from "@/lib/supabase/session";
 import { WeeklyHoursCard } from "./weekly-hours-card";
 import { GeneralSettingsCard } from "./general-settings-card";
 import { ExceptionsCard } from "./exceptions-card";
@@ -8,17 +9,7 @@ export const metadata: Metadata = { title: "Disponibilidade" };
 
 export default async function DisponibilidadePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: business } = await supabase
-    .from("businesses")
-    .select(
-      "id, antecedencia_minima_min, limite_dias_futuro, buffer_padrao_min, cancelamento_min_horas",
-    )
-    .eq("profile_id", user!.id)
-    .single();
+  const business = await getOwnBusiness();
 
   const [{ data: hours }, { data: exceptions }] = await Promise.all([
     supabase
