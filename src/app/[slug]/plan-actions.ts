@@ -1,10 +1,133 @@
 "use server";
 
+import { addDays, addMinutes, formatISO } from "date-fns";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { createPreapproval, createPreference } from "@/lib/mercadopago/client";
+import { normalizePhone } from "@/lib/phone";
+import { clientInfoSchema } from "@/lib/validations/public-booking";
+import { PLANO_ASSINATURA_EXPIRACAO_MINUTOS } from "@/lib/constants";
 
 type SubscribeResult = { ok: true; url: string } | { ok: false; error: string };
+
+export type RequestPlanSubscriptionResult =
+  | { ok: true; subId: string }
+  | { ok: false; error: string };
+
+// Self-service: o cliente escolhe o plano direto no link público, sem o
+// profissional precisar atribuir manualmente. Só funciona pra planos com
+// pagamento online habilitado — o resto do fluxo (escolher cartão/Pix e
+// pagar) reaproveita a página /planos/assinar/[subId] já existente, que era
+// usada só pelo link individual gerado dentro do app.
+export async function requestPlanSubscriptionAction(
+  slug: string,
+  planId: string,
+  nome: string,
+  telefone: string,
+  empresa?: string,
+): Promise<RequestPlanSubscriptionResult> {
+  // Campo-armadilha preenchido = formulário automatizado.
+  if (empresa) {
+    return { ok: false, error: "Não foi possível iniciar a assinatura. Tente novamente." };
+  }
+
+  const parsed = clientInfoSchema.safeParse({ nome, telefone });
+  if (!parsed.success) {
+    return { ok: false, error: "Confira seu nome e WhatsApp e tente novamente." };
+  }
+
+  const supabase = createAdminClient();
+
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!business) return { ok: false, error: "Loja não encontrada." };
+
+  const { data: plan } = await supabase
+    .from("client_plans")
+    .select("id, ciclo_dias, ativo, permite_pagamento_online")
+    .eq("id", planId)
+    .eq("business_id", business.id)
+    .maybeSingle();
+  if (!plan || !plan.ativo || !plan.permite_pagamento_online) {
+    return { ok: false, error: "Esse plano não está mais disponível." };
+  }
+
+  const { data: connection } = await supabase
+    .from("mp_connections")
+    .select("business_id")
+    .eq("business_id", business.id)
+    .maybeSingle();
+  if (!connection) {
+    return { ok: false, error: "Essa loja não está com pagamento online disponível no momento." };
+  }
+
+  const telefoneNormalizado = normalizePhone(parsed.data.telefone);
+  const { data: existingClient } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("business_id", business.id)
+    .eq("telefone", telefoneNormalizado)
+    .maybeSingle();
+
+  let clientId = existingClient?.id;
+  if (!clientId) {
+    const { data: newClient, error: clientError } = await supabase
+      .from("clients")
+      .insert({ business_id: business.id, nome: parsed.data.nome, telefone: telefoneNormalizado })
+      .select("id")
+      .single();
+    if (clientError || !newClient) {
+      return { ok: false, error: "Não foi possível salvar seus dados. Tente novamente." };
+    }
+    clientId = newClient.id;
+  }
+
+  const { data: activeSub } = await supabase
+    .from("client_plan_subs")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("ativo", true)
+    .maybeSingle();
+  if (activeSub) {
+    return {
+      ok: false,
+      error: "Você já tem um plano ativo com essa loja. Fale direto com o profissional para trocar de plano.",
+    };
+  }
+
+  const hoje = new Date();
+  const { data: sub, error } = await supabase
+    .from("client_plan_subs")
+    .insert({
+      client_id: clientId,
+      plan_id: planId,
+      data_inicio: formatISO(hoje, { representation: "date" }),
+      // Placeholder até o pagamento confirmar — o webhook reescreve essa
+      // data pro ciclo de verdade assim que a assinatura vira ativa.
+      data_renovacao: formatISO(addDays(hoje, plan.ciclo_dias), { representation: "date" }),
+      creditos_usados: {},
+      ativo: false,
+      pagamento_status: "pendente",
+      pagamento_expira_em: addMinutes(hoje, PLANO_ASSINATURA_EXPIRACAO_MINUTOS).toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (error || !sub) {
+    return {
+      ok: false,
+      error:
+        error?.code === "23505"
+          ? "Você já tem um plano ativo com essa loja."
+          : "Não foi possível iniciar a assinatura. Tente novamente.",
+    };
+  }
+
+  return { ok: true, subId: sub.id };
+}
 
 async function loadPendingSub(subId: string, slug: string) {
   const supabase = createAdminClient();

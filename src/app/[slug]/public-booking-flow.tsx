@@ -10,16 +10,19 @@ import { getAvailableSlotsAction, createAppointmentAction } from "./actions";
 import { ServicePicker } from "./service-picker";
 import { DayTimePicker } from "./day-time-picker";
 import { ClientInfoForm } from "./client-info-form";
-import type { PublicBusiness, PublicService } from "./types";
+import { PlansSection } from "./plans-section";
+import type { PublicBusiness, PublicPlan, PublicService } from "./types";
 
 type Step = "servico" | "horario" | "dados";
 
 export function PublicBookingFlow({
   business,
   services,
+  plans,
 }: {
   business: PublicBusiness;
   services: PublicService[];
+  plans: PublicPlan[];
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("servico");
@@ -116,6 +119,7 @@ export function PublicBookingFlow({
                   Ver ou cancelar
                 </Link>
               </p>
+              <PlansSection slug={business.slug} plans={plans} services={services} />
             </div>
           ) : null}
 

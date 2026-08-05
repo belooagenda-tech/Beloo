@@ -21,7 +21,14 @@ const getPublicBusiness = cache(async (slug: string) => {
     .eq("ativo", true)
     .order("created_at", { ascending: true });
 
-  return { business, services: services ?? [] };
+  const { data: plans } = await supabase
+    .from("client_plans")
+    .select("id, nome, valor_mensal, ciclo_dias, servicos_inclusos, permite_pagamento_online")
+    .eq("business_id", business.id)
+    .eq("ativo", true)
+    .order("created_at", { ascending: true });
+
+  return { business, services: services ?? [], plans: plans ?? [] };
 });
 
 export async function generateMetadata({
@@ -46,5 +53,7 @@ export default async function PublicBookingPage({
 
   if (!data) notFound();
 
-  return <PublicBookingFlow business={data.business} services={data.services} />;
+  return (
+    <PublicBookingFlow business={data.business} services={data.services} plans={data.plans} />
+  );
 }

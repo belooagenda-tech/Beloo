@@ -15,3 +15,12 @@ export type PublicService = {
   duracao_min: number;
   preco: number;
 };
+
+export type PublicPlan = {
+  id: string;
+  nome: string;
+  valor_mensal: number;
+  ciclo_dias: number;
+  servicos_inclusos: { service_id: string; quantidade: number | null }[];
+  permite_pagamento_online: boolean;
+};
