@@ -234,6 +234,59 @@ export type SaasSubscription = {
   updated_at: string;
 };
 
+export type DivulgadorStatus = "ativo" | "inativo";
+
+export type Divulgador = {
+  id: string;
+  nome: string;
+  email: string;
+  senha_hash: string;
+  codigo_afiliado: string;
+  stripe_account_id: string | null;
+  stripe_onboarding_completo: boolean;
+  percentual_comissao: number;
+  status: DivulgadorStatus;
+  criado_em: string;
+};
+
+export type DivulgadorSession = {
+  id: string;
+  divulgador_id: string;
+  token_hash: string;
+  expires_at: string;
+  created_at: string;
+};
+
+export type Indicacao = {
+  id: string;
+  divulgador_id: string;
+  profissional_id: string;
+  criado_em: string;
+};
+
+export type AssinaturaStripe = {
+  id: string;
+  profissional_id: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  divulgador_id: string | null;
+  criado_em: string;
+};
+
+export type ComissaoStatus = "confirmado" | "falhou";
+
+export type ComissaoRegistro = {
+  id: string;
+  divulgador_id: string;
+  profissional_id: string;
+  stripe_invoice_id: string;
+  valor_assinatura: number;
+  percentual_aplicado: number;
+  valor_comissao: number;
+  status: ComissaoStatus;
+  criado_em: string;
+};
+
 type Table<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -260,6 +313,11 @@ export type Database = {
       saas_plans: Table<SaasPlan>;
       saas_subscriptions: Table<SaasSubscription>;
       notifications: Table<Notification>;
+      divulgadores: Table<Divulgador>;
+      divulgador_sessions: Table<DivulgadorSession>;
+      indicacoes: Table<Indicacao>;
+      assinaturas_stripe: Table<AssinaturaStripe>;
+      comissoes_registro: Table<ComissaoRegistro>;
     };
     Views: Record<string, never>;
     Functions: {

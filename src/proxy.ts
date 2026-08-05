@@ -1,8 +1,12 @@
 import type { NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
+import { applyReferralCookie } from "@/lib/divulgador/referral-cookie";
 
-export function proxy(request: NextRequest) {
-  return updateSession(request);
+export async function proxy(request: NextRequest) {
+  const response = await updateSession(request);
+  // Só mexe no cookie de indicação quando a rota é /criar-agenda (ver
+  // applyReferralCookie) — não afeta o refresh de sessão do Supabase acima.
+  return applyReferralCookie(request, response);
 }
 
 export const config = {

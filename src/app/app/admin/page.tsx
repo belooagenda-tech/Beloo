@@ -5,7 +5,16 @@ import { getOwnProfile } from "@/lib/supabase/session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BillingSettingsCard } from "./billing-settings-card";
+import { DivulgadoresCard, type DivulgadorRow } from "./divulgadores-card";
+import { IndicacoesCard, type IndicacaoRow } from "./indicacoes-card";
+import { ComissoesCard, type ComissaoRow } from "./comissoes-card";
+import { normalizarPeriodo, resolvePeriodo } from "../(gated)/financeiro/period";
 import type { SaasSubscriptionStatus } from "@/lib/supabase/types";
+
+// Fuso fixo pro filtro de período do extrato de comissões — é um relatório
+// administrativo único (não por-negócio, como em Financeiro), não faz
+// sentido variar por timezone de loja.
+const ADMIN_TIMEZONE = "America/Sao_Paulo";
 
 export const metadata: Metadata = { title: "Admin" };
 
@@ -21,7 +30,11 @@ function formatarData(iso: string | null) {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ periodoComissoes?: string }>;
+}) {
   const profile = await getOwnProfile();
   if (!profile?.is_admin) {
     redirect("/app");
@@ -62,6 +75,81 @@ export default async function AdminPage() {
       currentPeriodEnd: sub?.current_period_end ?? null,
     };
   });
+
+  // ==========================================================================
+  // Divulgadores — sistema de comissões via Stripe Connect.
+  // ==========================================================================
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+
+  const { data: divulgadoresRaw } = await admin
+    .from("divulgadores")
+    .select(
+      "id, nome, email, codigo_afiliado, stripe_onboarding_completo, percentual_comissao, status, criado_em",
+    )
+    .order("criado_em", { ascending: false });
+
+  const divulgadores: DivulgadorRow[] = (divulgadoresRaw ?? []).map((d) => ({
+    id: d.id,
+    nome: d.nome,
+    email: d.email,
+    codigoAfiliado: d.codigo_afiliado,
+    stripeOnboardingCompleto: d.stripe_onboarding_completo,
+    percentualComissao: d.percentual_comissao,
+    status: d.status,
+  }));
+  const divulgadorNomeById = new Map(divulgadores.map((d) => [d.id, d.nome]));
+
+  const { data: indicacoesRaw } = await admin
+    .from("indicacoes")
+    .select("id, divulgador_id, profissional_id, criado_em")
+    .order("criado_em", { ascending: false });
+
+  const indicacaoBusinessIds = [...new Set((indicacoesRaw ?? []).map((i) => i.profissional_id))];
+  const [{ data: indicacaoBusinesses }, { data: indicacaoSubs }] = await Promise.all([
+    indicacaoBusinessIds.length > 0
+      ? admin.from("businesses").select("id, nome_loja").in("id", indicacaoBusinessIds)
+      : Promise.resolve({ data: [] }),
+    indicacaoBusinessIds.length > 0
+      ? admin.from("saas_subscriptions").select("business_id, status").in("business_id", indicacaoBusinessIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const businessNomeById = new Map((indicacaoBusinesses ?? []).map((b) => [b.id, b.nome_loja]));
+  const businessStatusById = new Map((indicacaoSubs ?? []).map((s) => [s.business_id, s.status]));
+
+  const indicacoes: IndicacaoRow[] = (indicacoesRaw ?? []).map((i) => ({
+    id: i.id,
+    divulgadorNome: divulgadorNomeById.get(i.divulgador_id) ?? "Divulgador removido",
+    profissionalNome: businessNomeById.get(i.profissional_id) ?? "Profissional removido",
+    status: businessStatusById.get(i.profissional_id) ?? "trial",
+    criadoEm: i.criado_em,
+  }));
+
+  const { periodoComissoes: periodoComissoesParam } = await searchParams;
+  const periodoComissoes = normalizarPeriodo(periodoComissoesParam);
+  const { de: deComissoes, ate: ateComissoes } = resolvePeriodo(periodoComissoes, ADMIN_TIMEZONE);
+
+  const { data: comissoesRaw } = await admin
+    .from("comissoes_registro")
+    .select("id, divulgador_id, profissional_id, valor_comissao, status, criado_em")
+    .gte("criado_em", deComissoes.toISOString())
+    .lte("criado_em", ateComissoes.toISOString())
+    .order("criado_em", { ascending: false });
+
+  const comissaoBusinessIds = [...new Set((comissoesRaw ?? []).map((c) => c.profissional_id))];
+  const { data: comissaoBusinesses } =
+    comissaoBusinessIds.length > 0
+      ? await admin.from("businesses").select("id, nome_loja").in("id", comissaoBusinessIds)
+      : { data: [] };
+  const comissaoBusinessNomeById = new Map((comissaoBusinesses ?? []).map((b) => [b.id, b.nome_loja]));
+
+  const comissoes: ComissaoRow[] = (comissoesRaw ?? []).map((c) => ({
+    id: c.id,
+    divulgadorNome: divulgadorNomeById.get(c.divulgador_id) ?? "Divulgador removido",
+    profissionalNome: comissaoBusinessNomeById.get(c.profissional_id) ?? "Profissional removido",
+    valorComissao: c.valor_comissao,
+    status: c.status,
+    criadoEm: c.criado_em,
+  }));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -124,6 +212,10 @@ export default async function AdminPage() {
           )}
         </CardContent>
       </Card>
+
+      <DivulgadoresCard divulgadores={divulgadores} cadastroUrl={`${siteUrl}/divulgador/cadastro`} />
+      <IndicacoesCard indicacoes={indicacoes} />
+      <ComissoesCard comissoes={comissoes} periodo={periodoComissoes} />
     </div>
   );
 }

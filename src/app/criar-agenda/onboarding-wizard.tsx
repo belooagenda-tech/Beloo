@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { AccountInput, StoreInput } from "@/lib/validations/onboarding";
 import type { DiaDisponibilidade } from "@/components/availability/types";
 import { Button } from "@/components/ui/button";
+import { linkReferralIfPresentAction } from "./referral-actions";
 import { WizardProgress } from "./wizard-progress";
 import { AccountStep } from "./steps/account-step";
 import { StoreStep } from "./steps/store-step";
@@ -94,6 +95,9 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
     setBusinessId(data.id);
     setNomeLoja(values.nomeLoja);
     setSlug(values.slug);
+    // Melhor esforço, não bloqueia o wizard: vincula ao divulgador do
+    // cookie de indicação, se houver um (ver src/proxy.ts).
+    linkReferralIfPresentAction(data.id).catch(() => {});
     setStep(3);
   }
 

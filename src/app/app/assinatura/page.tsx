@@ -5,6 +5,7 @@ import { getOwnBusiness } from "@/lib/supabase/session";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SaasSubscriptionCard } from "./saas-subscription-card";
+import { StripeSubscriptionCard } from "./stripe-subscription-card";
 
 export const metadata: Metadata = { title: "Assinatura" };
 
@@ -54,18 +55,33 @@ export default async function AssinaturaPage() {
 
   const { data: sub } = await supabase
     .from("saas_subscriptions")
-    .select("status, trial_ends_at, current_period_end")
+    .select("status, trial_ends_at, current_period_end, mp_preapproval_id")
     .eq("business_id", business.id)
     .maybeSingle();
 
+  // Quem já tem uma assinatura no Mercado Pago (mp_preapproval_id gravado)
+  // continua exatamente como sempre foi — o card e as actions do MP não
+  // mudam em nada pra quem já paga por lá. Só quem ainda nunca assinou (ou
+  // assinaria pela primeira vez agora) vê o novo fluxo via Stripe.
+  const jaAssinaPeloMercadoPago = Boolean(sub?.mp_preapproval_id);
+
   return (
     <div className="mx-auto max-w-md py-12">
-      <SaasSubscriptionCard
-        status={sub?.status ?? "trial"}
-        trialEndsAt={sub?.trial_ends_at ?? new Date().toISOString()}
-        currentPeriodEnd={sub?.current_period_end ?? null}
-        valorMensal={plan.valor_mensal}
-      />
+      {jaAssinaPeloMercadoPago ? (
+        <SaasSubscriptionCard
+          status={sub?.status ?? "trial"}
+          trialEndsAt={sub?.trial_ends_at ?? new Date().toISOString()}
+          currentPeriodEnd={sub?.current_period_end ?? null}
+          valorMensal={plan.valor_mensal}
+        />
+      ) : (
+        <StripeSubscriptionCard
+          status={sub?.status ?? "trial"}
+          trialEndsAt={sub?.trial_ends_at ?? new Date().toISOString()}
+          currentPeriodEnd={sub?.current_period_end ?? null}
+          valorMensal={plan.valor_mensal}
+        />
+      )}
     </div>
   );
 }

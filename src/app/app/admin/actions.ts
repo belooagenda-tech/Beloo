@@ -63,3 +63,53 @@ export async function toggleBillingAction(input: {
 
   return { ok: true };
 }
+
+// ============================================================================
+// Divulgadores — sistema de comissões via Stripe Connect. Roda em paralelo
+// à cobrança da Beloo acima; não interfere em nada do bloco anterior.
+// ============================================================================
+
+export async function updateDivulgadorComissaoAction(input: {
+  divulgadorId: string;
+  percentualComissao: number;
+}): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return { ok: false, error: "Sem permissão." };
+  }
+  if (input.percentualComissao < 0 || input.percentualComissao > 100) {
+    return { ok: false, error: "O percentual precisa ficar entre 0 e 100." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("divulgadores")
+    .update({ percentual_comissao: input.percentualComissao })
+    .eq("id", input.divulgadorId);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível salvar. Tente novamente." };
+  }
+  return { ok: true };
+}
+
+export async function toggleDivulgadorStatusAction(input: {
+  divulgadorId: string;
+  status: "ativo" | "inativo";
+}): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return { ok: false, error: "Sem permissão." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("divulgadores")
+    .update({ status: input.status })
+    .eq("id", input.divulgadorId);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível salvar. Tente novamente." };
+  }
+  return { ok: true };
+}
