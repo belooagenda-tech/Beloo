@@ -26,6 +26,13 @@ export async function createExpressAccount(email: string): Promise<string> {
     type: "express",
     email,
     capabilities: {
+      // Para contas no Brasil, a Stripe exige card_payments junto de
+      // transfers — só transfers isolado é rejeitado com
+      // "You cannot request the `transfers` capability without the
+      // `card_payments` capability for accounts in BR" (confirmado em
+      // produção). O divulgador não processa cobranças por conta própria,
+      // mas a capability precisa estar ativa mesmo assim.
+      card_payments: { requested: true },
       transfers: { requested: true },
     },
   });
