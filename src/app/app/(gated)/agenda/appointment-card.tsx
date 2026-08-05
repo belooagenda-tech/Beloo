@@ -54,6 +54,17 @@ export function AppointmentCard({
   const status = STATUS_META[appointment.status];
   const podeAgir = appointment.status === "agendado" || appointment.status === "confirmado";
 
+  // Entrada paga via Mercado Pago mas atendimento ainda não concluído — o
+  // profissional precisa ver isso na Agenda, senão cobra o valor cheio de
+  // novo na hora. Depois de concluído, essa informação já vem embutida no
+  // `payment` (registro final de appointment_payments).
+  const entradaJaPaga =
+    appointment.entrada_status === "pago" && appointment.status !== "concluido"
+      ? (appointment.entrada_valor ?? 0)
+      : 0;
+  const entradaEstornada =
+    appointment.status === "cancelado" && appointment.entrada_status === "reembolsado";
+
   return (
     <Card>
       <CardContent className="flex items-start gap-3 py-4">
@@ -79,10 +90,25 @@ export function AppointmentCard({
               <>
                 {" "}
                 ·{" "}
-                {payment.origem === "plano" ? "incluso no plano" : formatarPreco(payment.valor)}
+                {payment.origem === "plano"
+                  ? "incluso no plano"
+                  : payment.forma_pagamento === "misto" && payment.entrada_valor
+                    ? `${formatarPreco(payment.valor)} (${formatarPreco(payment.entrada_valor)} online + ${formatarPreco(payment.valor - payment.entrada_valor)} na hora)`
+                    : payment.forma_pagamento === "entrada_mp"
+                      ? `${formatarPreco(payment.valor)} · pago online`
+                      : formatarPreco(payment.valor)}
               </>
             ) : null}
           </p>
+          {entradaJaPaga > 0 ? (
+            <p className="mt-0.5 text-xs font-medium text-success">
+              Entrada paga: {formatarPreco(entradaJaPaga)}
+              {service ? ` de ${formatarPreco(service.preco)}` : ""} — falta cobrar o restante
+            </p>
+          ) : null}
+          {entradaEstornada ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">Entrada estornada ao cliente</p>
+          ) : null}
         </div>
 
         {podeAgir || appointment.status === "concluido" ? (

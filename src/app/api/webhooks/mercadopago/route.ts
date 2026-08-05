@@ -15,7 +15,7 @@ type Admin = SupabaseClient<Database>;
 async function handleAppointmentDeposit(admin: Admin, appointmentId: string, dataId: string) {
   const { data: appointment } = await admin
     .from("appointments")
-    .select("id, business_id, client_id, service_id, entrada_status")
+    .select("id, business_id, client_id, service_id, entrada_status, entrada_valor")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appointment) {
@@ -50,6 +50,24 @@ async function handleAppointmentDeposit(admin: Admin, appointmentId: string, dat
       .from("appointments")
       .update({ status: "agendado", entrada_status: "pago", mp_payment_id: payment.id })
       .eq("id", appointment.id);
+
+    // Registra a entrada já em appointment_payments — a Agenda e a aba
+    // Financeiro passam a contar esse dinheiro assim que ele realmente entra,
+    // em vez de só quando o profissional "concluir e receber" o atendimento
+    // depois. Se o atendimento já tiver sido concluído sem passar por aqui
+    // (não deveria acontecer, mas por segurança), não sobrescreve o registro.
+    const entradaValor = appointment.entrada_valor ?? payment.transactionAmount;
+    await admin.from("appointment_payments").upsert(
+      {
+        appointment_id: appointment.id,
+        valor: entradaValor,
+        forma_pagamento: "entrada_mp",
+        origem: "avulso",
+        entrada_valor: entradaValor,
+        pago_em: new Date().toISOString(),
+      },
+      { onConflict: "appointment_id", ignoreDuplicates: true },
+    );
 
     if (business) {
       const [{ data: client }, { data: service }] = await Promise.all([

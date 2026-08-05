@@ -63,6 +63,12 @@ export function AgendaDayView({
       return;
     }
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelado" } : a)));
+    if (resultado.pagamentoRemovido) {
+      // Entrada estornada com sucesso — o registro de receita já foi
+      // removido no servidor, tira daqui também pra não mostrar valor
+      // faturado num agendamento cancelado.
+      setPayments((prev) => prev.filter((p) => p.appointment_id !== id));
+    }
     if (resultado.avisoReembolso) {
       toast.warning(resultado.avisoReembolso);
     } else {

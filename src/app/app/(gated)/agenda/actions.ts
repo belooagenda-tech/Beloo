@@ -6,7 +6,7 @@ import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { refundPayment } from "@/lib/mercadopago/client";
 
 export type CancelFromAgendaResult =
-  | { ok: true; avisoReembolso?: string }
+  | { ok: true; avisoReembolso?: string; pagamentoRemovido: boolean }
   | { ok: false; error: string };
 
 export async function cancelAppointmentFromAgendaAction(
@@ -41,6 +41,15 @@ export async function cancelAppointmentFromAgendaAction(
     return { ok: false, error: "Agendamento não encontrado." };
   }
 
+  // Só pode cancelar antes do atendimento acontecer. Isso também protege a
+  // lógica de estorno abaixo: um agendamento concluído pode ter um pagamento
+  // "misto" (entrada + valor cobrado na hora) — reembolsar só a entrada via
+  // Mercado Pago e apagar o registro inteiro apagaria da receita um valor
+  // que realmente entrou (o cobrado presencialmente).
+  if (appointment.status !== "agendado" && appointment.status !== "confirmado") {
+    return { ok: false, error: "Esse agendamento não pode mais ser cancelado." };
+  }
+
   const { error: updateError } = await admin
     .from("appointments")
     .update({ status: "cancelado" })
@@ -50,6 +59,7 @@ export async function cancelAppointmentFromAgendaAction(
   }
 
   let avisoReembolso: string | undefined;
+  let pagamentoRemovido = false;
   if (appointment.entrada_status === "pago" && appointment.mp_payment_id) {
     try {
       const accessToken = await getValidAccessToken(admin, business.id);
@@ -59,6 +69,10 @@ export async function cancelAppointmentFromAgendaAction(
         .from("appointments")
         .update({ entrada_status: "reembolsado" })
         .eq("id", appointmentId);
+      // O dinheiro voltou para o cliente — remove o registro de receita da
+      // entrada para não aparecer mais como faturado na aba Financeiro.
+      await admin.from("appointment_payments").delete().eq("appointment_id", appointmentId);
+      pagamentoRemovido = true;
     } catch (err) {
       console.error("Beloo: falha ao reembolsar entrada automaticamente (Agenda)", err);
       avisoReembolso =
@@ -66,5 +80,5 @@ export async function cancelAppointmentFromAgendaAction(
     }
   }
 
-  return { ok: true, avisoReembolso };
+  return { ok: true, avisoReembolso, pagamentoRemovido };
 }

@@ -1,4 +1,9 @@
-import type { AppointmentStatus, FormaPagamento, OrigemPagamento } from "@/lib/supabase/types";
+import type {
+  AppointmentStatus,
+  EntradaStatus,
+  FormaPagamento,
+  OrigemPagamento,
+} from "@/lib/supabase/types";
 
 export type AgendaService = {
   id: string;
@@ -18,6 +23,8 @@ export type AgendaAppointment = {
   fim: string;
   status: AppointmentStatus;
   observacoes: string | null;
+  entrada_status: EntradaStatus;
+  entrada_valor: number | null;
 };
 
 export type AgendaClient = {
@@ -32,4 +39,5 @@ export type AgendaPayment = {
   valor: number;
   forma_pagamento: FormaPagamento;
   origem: OrigemPagamento;
+  entrada_valor: number | null;
 };

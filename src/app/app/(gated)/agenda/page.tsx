@@ -30,7 +30,9 @@ export default async function AgendaPage({
       .order("nome", { ascending: true }),
     supabase
       .from("appointments")
-      .select("id, client_id, service_id, inicio, fim, status, observacoes")
+      .select(
+        "id, client_id, service_id, inicio, fim, status, observacoes, entrada_status, entrada_valor",
+      )
       .eq("business_id", business!.id)
       .gte("inicio", dayStart.toISOString())
       .lt("inicio", dayEnd.toISOString())
@@ -47,7 +49,7 @@ export default async function AgendaPage({
     appointmentIds.length > 0
       ? supabase
           .from("appointment_payments")
-          .select("id, appointment_id, valor, forma_pagamento, origem")
+          .select("id, appointment_id, valor, forma_pagamento, origem, entrada_valor")
           .in("appointment_id", appointmentIds)
       : Promise.resolve({ data: [] }),
   ]);

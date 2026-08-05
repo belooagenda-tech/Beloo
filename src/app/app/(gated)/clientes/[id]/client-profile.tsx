@@ -229,7 +229,11 @@ export function ClientProfile({
                               ·{" "}
                               {payment.origem === "plano"
                                 ? "incluso no plano"
-                                : formatarPreco(payment.valor)}
+                                : payment.forma_pagamento === "misto" && payment.entrada_valor
+                                  ? `${formatarPreco(payment.valor)} (${formatarPreco(payment.entrada_valor)} online + ${formatarPreco(payment.valor - payment.entrada_valor)} na hora)`
+                                  : payment.forma_pagamento === "entrada_mp"
+                                    ? `${formatarPreco(payment.valor)} · pago online`
+                                    : formatarPreco(payment.valor)}
                             </>
                           ) : null}
                         </p>

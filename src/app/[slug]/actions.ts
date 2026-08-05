@@ -448,6 +448,9 @@ export async function cancelAppointmentAction(
         .from("appointments")
         .update({ entrada_status: "reembolsado" })
         .eq("id", appointmentId);
+      // O dinheiro voltou para o cliente — remove o registro de receita da
+      // entrada para não aparecer mais como faturado na aba Financeiro.
+      await supabase.from("appointment_payments").delete().eq("appointment_id", appointmentId);
     } catch (err) {
       console.error("Beloo: falha ao reembolsar entrada automaticamente", err);
       avisoReembolso = " O reembolso automático da entrada falhou — verifique manualmente no Mercado Pago.";

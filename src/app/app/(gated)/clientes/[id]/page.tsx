@@ -70,7 +70,7 @@ export default async function ClientDetailPage({
     appointmentIds.length > 0
       ? await supabase
           .from("appointment_payments")
-          .select("appointment_id, valor, forma_pagamento, origem")
+          .select("appointment_id, valor, forma_pagamento, origem, entrada_valor")
           .in("appointment_id", appointmentIds)
       : { data: [] };
 

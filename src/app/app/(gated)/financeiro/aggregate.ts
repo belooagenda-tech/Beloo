@@ -1,15 +1,8 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { differenceInCalendarDays, startOfWeek } from "date-fns";
 import type { FormaPagamento } from "@/lib/supabase/types";
+import { FORMA_PAGAMENTO_LABELS } from "@/lib/payments/forma-pagamento";
 import type { FinancePayment, PaymentMethodRevenue, PeriodBucket, ServiceRevenue } from "./types";
-
-const FORMA_LABELS: Record<FormaPagamento, string> = {
-  dinheiro: "Dinheiro",
-  pix: "Pix",
-  debito: "Débito",
-  credito: "Crédito",
-  plano: "Plano",
-};
 
 export function bucketByPeriod(
   payments: FinancePayment[],
@@ -86,8 +79,8 @@ export function aggregateByFormaPagamento(payments: FinancePayment[]): PaymentMe
     totals.set(payment.forma_pagamento, (totals.get(payment.forma_pagamento) ?? 0) + payment.valor);
   }
 
-  return (Object.keys(FORMA_LABELS) as FormaPagamento[])
-    .map((forma) => ({ forma, label: FORMA_LABELS[forma], total: totals.get(forma) ?? 0 }))
+  return (Object.keys(FORMA_PAGAMENTO_LABELS) as FormaPagamento[])
+    .map((forma) => ({ forma, label: FORMA_PAGAMENTO_LABELS[forma], total: totals.get(forma) ?? 0 }))
     .filter((item) => item.total > 0)
     .sort((a, b) => b.total - a.total);
 }

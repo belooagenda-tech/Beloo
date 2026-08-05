@@ -8,7 +8,16 @@ export type AppointmentStatus =
 
 export type EntradaStatus = "nao_aplicavel" | "pendente" | "pago" | "reembolsado" | "expirado";
 
-export type FormaPagamento = "dinheiro" | "pix" | "debito" | "credito" | "plano";
+// "entrada_mp" = pago 100% online (Mercado Pago) antes do atendimento;
+// "misto" = parte paga online (entrada) + parte cobrada na hora.
+export type FormaPagamento =
+  | "dinheiro"
+  | "pix"
+  | "debito"
+  | "credito"
+  | "plano"
+  | "entrada_mp"
+  | "misto";
 
 export type OrigemPagamento = "avulso" | "plano";
 
@@ -182,6 +191,9 @@ export type AppointmentPayment = {
   valor: number;
   forma_pagamento: FormaPagamento;
   origem: OrigemPagamento;
+  // Fatia de `valor` que já tinha entrado via entrada online (Mercado Pago)
+  // antes da conclusão do atendimento. Null quando não houve entrada.
+  entrada_valor: number | null;
   pago_em: string;
   created_at: string;
   updated_at: string;
@@ -265,6 +277,7 @@ export type Database = {
           p_valor: number;
           p_forma_pagamento: string;
           p_origem: string;
+          p_entrada_valor?: number;
         };
         Returns: { payment_id: string; credito_descontado: boolean }[];
       };

@@ -27,6 +27,7 @@ export type HistoryPayment = {
   valor: number;
   forma_pagamento: FormaPagamento;
   origem: OrigemPagamento;
+  entrada_valor: number | null;
 };
 
 export type ServiceLookup = { id: string; nome: string };

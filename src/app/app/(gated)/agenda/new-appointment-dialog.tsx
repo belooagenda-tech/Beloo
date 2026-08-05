@@ -113,7 +113,7 @@ function NewAppointmentForm({
         fim: fim.toISOString(),
         status: "agendado",
       })
-      .select("id, client_id, service_id, inicio, fim, status, observacoes")
+      .select("id, client_id, service_id, inicio, fim, status, observacoes, entrada_status, entrada_valor")
       .single();
     setSubmitting(false);
 

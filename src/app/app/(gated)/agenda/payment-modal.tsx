@@ -40,6 +40,10 @@ function formatarPreco(preco: number) {
   return preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function round2(valor: number) {
+  return Math.round(valor * 100) / 100;
+}
+
 function mensagemErroRpc(message: string) {
   if (message.includes("no_active_plan") || message.includes("plan_does_not_cover_service")) {
     return "O cliente não tem mais um plano ativo que cubra esse serviço. Registrando como avulso.";
@@ -66,9 +70,31 @@ function PaymentForm({
   onCompleted: (payment: AgendaPayment) => void;
 }) {
   const jaConcluido = appointment.status === "concluido";
+
+  // Valor da entrada que o cliente já pagou online (Mercado Pago) antes do
+  // atendimento. Continua valendo mesmo depois de concluído (entrada_status
+  // só muda para "reembolsado"/"expirado" em cancelamento/expiração), então
+  // dá pra usar esse mesmo cálculo tanto para concluir quanto para editar um
+  // pagamento já registrado.
+  const entradaJaPaga = appointment.entrada_status === "pago" ? (appointment.entrada_valor ?? 0) : 0;
+
+  // Quanto falta cobrar do cliente agora. Antes da conclusão, o único
+  // registro que pode existir em appointment_payments é a própria entrada
+  // (valor = entradaJaPaga) — nesse caso o restante é sempre serviço menos
+  // entrada. Editando um atendimento já concluído, existingPayment.valor é o
+  // TOTAL que ficou registrado da última vez, então o restante é esse total
+  // menos a entrada (que nunca muda depois de paga).
+  const valorRestantePadrao =
+    jaConcluido && existingPayment
+      ? Math.max(round2(existingPayment.valor - entradaJaPaga), 0)
+      : Math.max(round2(service.preco - entradaJaPaga), 0);
+
+  const totalmenteCobertoPelaEntrada = entradaJaPaga > 0 && valorRestantePadrao <= 0;
+
   const [coverage, setCoverage] = useState<PlanCoverage | null>(null);
   const [checkingCoverage, setCheckingCoverage] = useState(!jaConcluido && !existingPayment);
   const [forcarAvulso, setForcarAvulso] = useState(false);
+  const [ajustarValor, setAjustarValor] = useState(!totalmenteCobertoPelaEntrada);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,15 +106,18 @@ function PaymentForm({
   } = useForm<AvulsoPaymentInput>({
     resolver: zodResolver(avulsoPaymentSchema),
     defaultValues: {
-      valor: existingPayment?.valor ?? service.preco,
+      valor: valorRestantePadrao,
       formaPagamento:
-        existingPayment && existingPayment.origem === "avulso"
+        existingPayment && existingPayment.origem === "avulso" && !entradaJaPaga
           ? (existingPayment.forma_pagamento as AvulsoPaymentInput["formaPagamento"])
           : undefined,
     },
   });
 
   useEffect(() => {
+    // Já existe um registro de pagamento (seja a entrada online, seja um
+    // atendimento já concluído) — não há cobertura de plano a checar, o
+    // dinheiro já entrou (ou já foi registrado) por outro caminho.
     if (jaConcluido || existingPayment) return;
     let active = true;
     (async () => {
@@ -131,19 +160,23 @@ function PaymentForm({
       valor: service.preco,
       forma_pagamento: "plano",
       origem: "plano",
+      entrada_valor: null,
     });
     onOpenChange(false);
   }
 
-  async function onSubmitAvulso(values: AvulsoPaymentInput) {
+  // Entrada online cobre o valor total do serviço — não sobra nada pra
+  // cobrar na hora, só confirmar a conclusão.
+  async function concluirComEntradaTotal() {
     setSubmitting(true);
     setError(null);
     const supabase = createClient();
     const { error: rpcError } = await supabase.rpc("complete_appointment_payment", {
       p_appointment_id: appointment.id,
-      p_valor: values.valor,
-      p_forma_pagamento: values.formaPagamento,
+      p_valor: entradaJaPaga,
+      p_forma_pagamento: "entrada_mp",
       p_origem: "avulso",
+      p_entrada_valor: entradaJaPaga,
     });
     setSubmitting(false);
 
@@ -155,9 +188,48 @@ function PaymentForm({
     onCompleted({
       id: existingPayment?.id ?? "",
       appointment_id: appointment.id,
-      valor: values.valor,
-      forma_pagamento: values.formaPagamento,
+      valor: entradaJaPaga,
+      forma_pagamento: "entrada_mp",
       origem: "avulso",
+      entrada_valor: entradaJaPaga,
+    });
+    onOpenChange(false);
+  }
+
+  async function onSubmitAvulso(values: AvulsoPaymentInput) {
+    setSubmitting(true);
+    setError(null);
+    const supabase = createClient();
+
+    // O valor total registrado é sempre entrada + o que está sendo cobrado
+    // agora — nunca sobrescreve a entrada, só soma o que falta. A forma de
+    // pagamento reflete que parte veio online: "entrada_mp" quando a entrada
+    // cobriu tudo, "misto" quando teve parte online e parte na hora.
+    const totalValor = round2(entradaJaPaga + values.valor);
+    const formaFinal: FormaPagamento =
+      entradaJaPaga > 0 ? (values.valor > 0 ? "misto" : "entrada_mp") : values.formaPagamento;
+
+    const { error: rpcError } = await supabase.rpc("complete_appointment_payment", {
+      p_appointment_id: appointment.id,
+      p_valor: totalValor,
+      p_forma_pagamento: formaFinal,
+      p_origem: "avulso",
+      p_entrada_valor: entradaJaPaga,
+    });
+    setSubmitting(false);
+
+    if (rpcError) {
+      setError(mensagemErroRpc(rpcError.message));
+      return;
+    }
+
+    onCompleted({
+      id: existingPayment?.id ?? "",
+      appointment_id: appointment.id,
+      valor: totalValor,
+      forma_pagamento: formaFinal,
+      origem: "avulso",
+      entrada_valor: entradaJaPaga > 0 ? entradaJaPaga : null,
     });
     onOpenChange(false);
   }
@@ -213,6 +285,46 @@ function PaymentForm({
     );
   }
 
+  const entradaInfo =
+    entradaJaPaga > 0 ? (
+      <Alert>
+        <AlertDescription>
+          Cliente já pagou <strong>{formatarPreco(entradaJaPaga)}</strong> de entrada pelo
+          Mercado Pago{service.preco > entradaJaPaga ? ` (de ${formatarPreco(service.preco)})` : ""}.
+          Isso já está contado no Financeiro — não cobre esse valor de novo.
+        </AlertDescription>
+      </Alert>
+    ) : null;
+
+  // Entrada cobriu o valor todo e o profissional ainda não pediu pra ajustar
+  // — só confirma a conclusão, sem pedir forma de pagamento pro que já foi
+  // pago online.
+  if (totalmenteCobertoPelaEntrada && !ajustarValor) {
+    return (
+      <div className="space-y-4">
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+        {entradaInfo}
+        <DialogFooter className="flex-col gap-2 sm:flex-col">
+          <Button onClick={concluirComEntradaTotal} disabled={submitting} className="w-full">
+            {submitting ? "Concluindo..." : "Concluir atendimento"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => setAjustarValor(true)}
+          >
+            Cobrar valor adicional
+          </Button>
+        </DialogFooter>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmitAvulso)} className="space-y-4" noValidate>
       {error ? (
@@ -221,8 +333,12 @@ function PaymentForm({
         </Alert>
       ) : null}
 
+      {entradaInfo}
+
       <div className="space-y-1.5">
-        <Label htmlFor="valor-pagamento">Valor</Label>
+        <Label htmlFor="valor-pagamento">
+          {entradaJaPaga > 0 ? "Valor a cobrar agora (restante)" : "Valor"}
+        </Label>
         <Input
           id="valor-pagamento"
           type="number"
@@ -297,7 +413,7 @@ export function PaymentModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {existingPayment ? "Pagamento do atendimento" : "Concluir e receber"}
+            {appointment?.status === "concluido" ? "Pagamento do atendimento" : "Concluir e receber"}
           </DialogTitle>
         </DialogHeader>
         {open && appointment && service && client ? (

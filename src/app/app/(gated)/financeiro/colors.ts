@@ -9,4 +9,6 @@ export const COR_FORMA_PAGAMENTO: Record<FormaPagamento, string> = {
   debito: "var(--chart-3)",
   credito: "var(--chart-4)",
   plano: "var(--chart-5)",
+  entrada_mp: "var(--chart-2)",
+  misto: "var(--chart-3)",
 };
