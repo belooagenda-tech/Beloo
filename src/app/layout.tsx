@@ -18,7 +18,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Beloo — Agenda online para profissionais de beleza",
+    default: "Beloo — Agenda online para profissionais",
     template: "%s · Beloo",
   },
   description:

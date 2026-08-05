@@ -49,7 +49,10 @@ export default async function AdminPage({
     .maybeSingle();
 
   const [{ data: businesses }, { data: subscriptions }] = await Promise.all([
-    admin.from("businesses").select("id, nome_loja, profile_id").order("nome_loja", { ascending: true }),
+    admin
+      .from("businesses")
+      .select("id, nome_loja, slug, profile_id")
+      .order("nome_loja", { ascending: true }),
     admin
       .from("saas_subscriptions")
       .select("business_id, status, trial_ends_at, current_period_end"),
@@ -69,6 +72,7 @@ export default async function AdminPage({
     return {
       id: business.id,
       nomeLoja: business.nome_loja,
+      slug: business.slug,
       email: emailById.get(business.profile_id) ?? "—",
       status: sub?.status ?? "trial",
       trialEndsAt: sub?.trial_ends_at ?? null,
@@ -185,7 +189,8 @@ export default async function AdminPage({
                     <th className="py-2 pr-3 font-medium">E-mail</th>
                     <th className="py-2 pr-3 font-medium">Status</th>
                     <th className="py-2 pr-3 font-medium">Trial até</th>
-                    <th className="py-2 font-medium">Próxima cobrança</th>
+                    <th className="py-2 pr-3 font-medium">Próxima cobrança</th>
+                    <th className="py-2 font-medium">Link público</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -201,8 +206,18 @@ export default async function AdminPage({
                       <td className="py-2 pr-3 text-muted-foreground">
                         {formatarData(linha.trialEndsAt)}
                       </td>
-                      <td className="py-2 text-muted-foreground">
+                      <td className="py-2 pr-3 text-muted-foreground">
                         {formatarData(linha.currentPeriodEnd)}
+                      </td>
+                      <td className="py-2">
+                        <a
+                          href={`${siteUrl}/${linha.slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          /{linha.slug}
+                        </a>
                       </td>
                     </tr>
                   ))}
