@@ -200,45 +200,7 @@ export async function createAppointmentAction(input: {
   }
 
   const inicio = new Date(input.inicioISO);
-  const fim = addMinutes(inicio, service.duracao_min);
   const telefoneNormalizado = normalizePhone(parsed.data.telefone);
-
-  const { data: existingClient } = await supabase
-    .from("clients")
-    .select("id, nome")
-    .eq("business_id", business.id)
-    .eq("telefone", telefoneNormalizado)
-    .maybeSingle();
-
-  let clientId = existingClient?.id;
-  const clientNome = existingClient?.nome ?? parsed.data.nome;
-
-  if (!clientId) {
-    const { data: newClient, error: clientError } = await supabase
-      .from("clients")
-      .insert({ business_id: business.id, nome: parsed.data.nome, telefone: telefoneNormalizado })
-      .select("id")
-      .single();
-    if (clientError || !newClient) {
-      return { ok: false, error: "Não foi possível concluir o agendamento. Tente novamente." };
-    }
-    clientId = newClient.id;
-  } else {
-    const { count } = await supabase
-      .from("appointments")
-      .select("id", { count: "exact", head: true })
-      .eq("client_id", clientId)
-      .in("status", ["agendado", "confirmado"])
-      .gt("inicio", new Date().toISOString());
-
-    if ((count ?? 0) >= MAX_AGENDAMENTOS_FUTUROS_POR_CLIENTE) {
-      return {
-        ok: false,
-        error:
-          "Você já tem vários agendamentos futuros com essa loja. Cancele algum antes de criar outro, ou fale direto com a loja.",
-      };
-    }
-  }
 
   let entradaAccessToken: string | null = null;
   const requerEntrada = business.entrada_ativa && business.entrada_percentual > 0;
@@ -258,34 +220,45 @@ export async function createAppointmentAction(input: {
   const entradaValor = cobrarEntrada
     ? Math.round(service.preco * business.entrada_percentual) / 100
     : null;
+  const entradaExpiraEm = cobrarEntrada
+    ? addMinutes(new Date(), ENTRADA_EXPIRACAO_MINUTOS).toISOString()
+    : null;
 
-  const { data: appointment, error: appointmentError } = await supabase
-    .from("appointments")
-    .insert({
-      business_id: business.id,
-      client_id: clientId,
-      service_id: service.id,
-      inicio: inicio.toISOString(),
-      fim: fim.toISOString(),
-      status: cobrarEntrada ? "aguardando_pagamento" : "agendado",
-      entrada_status: cobrarEntrada ? "pendente" : "nao_aplicavel",
-      entrada_valor: entradaValor,
-      entrada_expira_em: cobrarEntrada
-        ? addMinutes(new Date(), ENTRADA_EXPIRACAO_MINUTOS).toISOString()
-        : null,
-    })
-    .select("id")
-    .single();
+  // A escrita (achar/criar cliente + checar limite + inserir com o
+  // constraint de exclusão de horário) agora é atômica dentro da RPC — ver
+  // supabase/migrations/20260807000003_public_booking_rpc.sql. Único ponto
+  // de verdade sobre quem pode gravar o quê nesse fluxo público, em vez de
+  // filtros espalhados em TypeScript.
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("create_public_appointment", {
+    p_slug: input.slug,
+    p_service_id: service.id,
+    p_inicio: inicio.toISOString(),
+    p_nome: parsed.data.nome,
+    p_telefone: telefoneNormalizado,
+    p_cobrar_entrada: Boolean(cobrarEntrada),
+    p_entrada_valor: entradaValor,
+    p_entrada_expira_em: entradaExpiraEm,
+    p_max_agendamentos_futuros: MAX_AGENDAMENTOS_FUTUROS_POR_CLIENTE,
+  });
 
-  if (appointmentError || !appointment) {
-    return {
-      ok: false,
-      error:
-        appointmentError?.code === "23P01"
-          ? "Esse horário acabou de ser preenchido por outro cliente. Escolha outro horário."
-          : "Não foi possível concluir o agendamento. Tente novamente.",
-    };
+  if (rpcError || !rpcResult) {
+    if (rpcError?.code === "23P01") {
+      return { ok: false, error: "Esse horário acabou de ser preenchido por outro cliente. Escolha outro horário." };
+    }
+    if (rpcError?.code === "BL003") {
+      return {
+        ok: false,
+        error:
+          "Você já tem vários agendamentos futuros com essa loja. Cancele algum antes de criar outro, ou fale direto com a loja.",
+      };
+    }
+    if (rpcError?.code === "BL002") {
+      return { ok: false, error: "Esse serviço não está mais disponível." };
+    }
+    return { ok: false, error: "Não foi possível concluir o agendamento. Tente novamente." };
   }
+
+  const appointmentId = rpcResult.appointment_id;
 
   if (cobrarEntrada && entradaAccessToken && entradaValor) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
@@ -293,27 +266,27 @@ export async function createAppointmentAction(input: {
       const preference = await createPreference(entradaAccessToken, {
         title: `Entrada — ${service.nome}`,
         amount: entradaValor,
-        externalReference: appointment.id,
-        successUrl: `${siteUrl}/${input.slug}/confirmacao?a=${appointment.id}`,
+        externalReference: appointmentId,
+        successUrl: `${siteUrl}/${input.slug}/confirmacao?a=${appointmentId}`,
         failureUrl: `${siteUrl}/${input.slug}?pagamento=falhou`,
-        pendingUrl: `${siteUrl}/${input.slug}/confirmacao?a=${appointment.id}`,
-        notificationUrl: `${siteUrl}/api/webhooks/mercadopago?appointment=${appointment.id}`,
+        pendingUrl: `${siteUrl}/${input.slug}/confirmacao?a=${appointmentId}`,
+        notificationUrl: `${siteUrl}/api/webhooks/mercadopago?appointment=${appointmentId}`,
       });
 
       await supabase
         .from("appointments")
         .update({ mp_preference_id: preference.id })
-        .eq("id", appointment.id);
+        .eq("id", appointmentId);
 
-      return { ok: true, appointmentId: appointment.id, pagamentoUrl: preference.initPoint };
+      return { ok: true, appointmentId, pagamentoUrl: preference.initPoint };
     } catch (err) {
       logError("public_booking.criar_preferencia_mp", err, {
         businessId: business.id,
-        appointmentId: appointment.id,
+        appointmentId,
       });
       // Libera o horário — sem link de pagamento não há como o cliente
       // confirmar esse agendamento.
-      await supabase.from("appointments").delete().eq("id", appointment.id);
+      await supabase.from("appointments").delete().eq("id", appointmentId);
       return {
         ok: false,
         error: "Não foi possível iniciar o pagamento da entrada. Tente novamente.",
@@ -321,14 +294,14 @@ export async function createAppointmentAction(input: {
     }
   }
 
-  const horario = formatInTimeZone(inicio, business.timezone, "dd/MM 'às' HH:mm");
+  const horario = formatInTimeZone(inicio, rpcResult.business_timezone, "dd/MM 'às' HH:mm");
   try {
     await notifyProfessional(supabase, {
-      profileId: business.profile_id,
+      profileId: rpcResult.profile_id,
       tipo: "novo_agendamento",
       titulo: "Novo agendamento",
-      corpo: `${clientNome} agendou ${service.nome} para ${horario}.`,
-      appointmentId: appointment.id,
+      corpo: `${rpcResult.client_nome} agendou ${rpcResult.service_nome} para ${horario}.`,
+      appointmentId,
       url: "/app/agenda",
     });
   } catch {
@@ -336,7 +309,7 @@ export async function createAppointmentAction(input: {
     // derrubar a resposta para o cliente.
   }
 
-  return { ok: true, appointmentId: appointment.id };
+  return { ok: true, appointmentId };
 }
 
 export type PublicAppointmentSummary = {
@@ -429,56 +402,53 @@ export async function cancelAppointmentAction(
   const supabase = createAdminClient();
   const telefoneNormalizado = normalizePhone(telefone);
 
-  const { data: business } = await supabase
+  // Só para formatar a mensagem de erro "até Xh antes" caso o cancelamento
+  // esteja fora do prazo — leitura pública, sem risco (mesmos dados já
+  // visíveis na própria página de agendamento). A checagem que vale de
+  // verdade acontece dentro da RPC.
+  const { data: businessParaMensagem } = await supabase
     .from("businesses")
-    .select("id, profile_id, timezone, cancelamento_min_horas")
+    .select("cancelamento_min_horas")
     .eq("slug", slug)
     .maybeSingle();
-  if (!business) return { ok: false, error: "Loja não encontrada." };
 
-  const { data: appointment } = await supabase
-    .from("appointments")
-    .select("id, client_id, service_id, inicio, status, entrada_status, mp_payment_id")
-    .eq("id", appointmentId)
-    .eq("business_id", business.id)
-    .maybeSingle();
-  if (!appointment) return { ok: false, error: "Agendamento não encontrado." };
+  // Achar o agendamento + conferir telefone + checar status/prazo + cancelar
+  // é tudo atômico dentro da RPC — ver
+  // supabase/migrations/20260807000003_public_booking_rpc.sql.
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("cancel_public_appointment", {
+    p_slug: slug,
+    p_appointment_id: appointmentId,
+    p_telefone: telefoneNormalizado,
+  });
 
-  const { data: client } = await supabase
-    .from("clients")
-    .select("id, nome, telefone")
-    .eq("id", appointment.client_id)
-    .maybeSingle();
-  if (!client || client.telefone !== telefoneNormalizado) {
-    return { ok: false, error: "Não foi possível confirmar seus dados." };
-  }
-
-  if (appointment.status !== "agendado" && appointment.status !== "confirmado") {
-    return { ok: false, error: "Esse agendamento não pode mais ser cancelado." };
-  }
-
-  const limiteMs = business.cancelamento_min_horas * 60 * 60_000;
-  if (new Date(appointment.inicio).getTime() - Date.now() < limiteMs) {
-    return {
-      ok: false,
-      error: `Esse agendamento só pode ser cancelado até ${business.cancelamento_min_horas}h antes do horário marcado. Entre em contato direto com a loja.`,
-    };
-  }
-
-  const { error: updateError } = await supabase
-    .from("appointments")
-    .update({ status: "cancelado" })
-    .eq("id", appointmentId);
-  if (updateError) {
+  if (rpcError || !rpcResult) {
+    if (rpcError?.code === "BL005") {
+      return { ok: false, error: "Não foi possível confirmar seus dados." };
+    }
+    if (rpcError?.code === "BL006") {
+      return { ok: false, error: "Esse agendamento não pode mais ser cancelado." };
+    }
+    if (rpcError?.code === "BL007") {
+      const horas = businessParaMensagem?.cancelamento_min_horas;
+      return {
+        ok: false,
+        error: horas
+          ? `Esse agendamento só pode ser cancelado até ${horas}h antes do horário marcado. Entre em contato direto com a loja.`
+          : "Esse agendamento não pode mais ser cancelado.",
+      };
+    }
+    if (rpcError?.code === "BL001" || rpcError?.code === "BL004") {
+      return { ok: false, error: "Agendamento não encontrado." };
+    }
     return { ok: false, error: "Não foi possível cancelar. Tente novamente." };
   }
 
   let avisoReembolso = "";
-  if (appointment.entrada_status === "pago" && appointment.mp_payment_id) {
+  if (rpcResult.entrada_status === "pago" && rpcResult.mp_payment_id) {
     try {
-      const accessToken = await getValidAccessToken(supabase, business.id);
+      const accessToken = await getValidAccessToken(supabase, rpcResult.business_id);
       if (!accessToken) throw new Error("sem conexão Mercado Pago");
-      await refundPayment(accessToken, appointment.mp_payment_id);
+      await refundPayment(accessToken, rpcResult.mp_payment_id);
       await supabase
         .from("appointments")
         .update({ entrada_status: "reembolsado" })
@@ -488,27 +458,22 @@ export async function cancelAppointmentAction(
       await supabase.from("appointment_payments").delete().eq("appointment_id", appointmentId);
     } catch (err) {
       logError("public_booking.reembolso_automatico", err, {
-        businessId: business.id,
+        businessId: rpcResult.business_id,
         appointmentId,
       });
       avisoReembolso = " O reembolso automático da entrada falhou — verifique manualmente no Mercado Pago.";
     }
   }
 
-  const { data: service } = await supabase
-    .from("services")
-    .select("nome")
-    .eq("id", appointment.service_id)
-    .maybeSingle();
-  const horario = formatInTimeZone(new Date(appointment.inicio), business.timezone, "dd/MM 'às' HH:mm");
+  const horario = formatInTimeZone(new Date(rpcResult.inicio), rpcResult.business_timezone, "dd/MM 'às' HH:mm");
 
   try {
     await notifyProfessional(supabase, {
-      profileId: business.profile_id,
+      profileId: rpcResult.profile_id,
       tipo: "cancelamento",
       titulo: "Agendamento cancelado",
-      corpo: `${client.nome} cancelou ${service?.nome ?? "um atendimento"} de ${horario}.${avisoReembolso}`,
-      appointmentId: appointment.id,
+      corpo: `${rpcResult.client_nome} cancelou ${rpcResult.service_nome ?? "um atendimento"} de ${horario}.${avisoReembolso}`,
+      appointmentId: rpcResult.appointment_id,
       url: "/app/agenda",
     });
   } catch {

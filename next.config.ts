@@ -33,6 +33,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  images: {
+    // Permite otimizar via next/image a logo da loja, que fica no Storage
+    // público do Supabase (bucket "logos") — hostname genérico (não fixo no
+    // projeto) porque dev/preview/produção usam projetos Supabase diferentes.
+    remotePatterns: [{ protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" }],
+  },
   async headers() {
     return [
       {

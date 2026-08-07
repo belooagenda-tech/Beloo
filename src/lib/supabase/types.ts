@@ -366,6 +366,43 @@ export type Database = {
         Args: Record<string, never>;
         Returns: undefined;
       };
+      create_public_appointment: {
+        Args: {
+          p_slug: string;
+          p_service_id: string;
+          p_inicio: string;
+          p_nome: string;
+          p_telefone: string;
+          p_cobrar_entrada: boolean;
+          p_entrada_valor: number | null;
+          p_entrada_expira_em: string | null;
+          p_max_agendamentos_futuros: number;
+        };
+        Returns: {
+          appointment_id: string;
+          client_id: string;
+          client_nome: string;
+          business_id: string;
+          profile_id: string;
+          business_timezone: string;
+          service_nome: string;
+        };
+      };
+      cancel_public_appointment: {
+        Args: { p_slug: string; p_appointment_id: string; p_telefone: string };
+        Returns: {
+          appointment_id: string;
+          business_id: string;
+          profile_id: string;
+          business_timezone: string;
+          client_nome: string;
+          service_id: string;
+          service_nome: string | null;
+          inicio: string;
+          entrada_status: string;
+          mp_payment_id: string | null;
+        };
+      };
     };
   };
 };

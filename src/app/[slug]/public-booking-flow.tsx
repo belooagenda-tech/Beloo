@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/brand/logo";
@@ -92,10 +93,12 @@ export function PublicBookingFlow({
         <div className="w-full max-w-md">
           <div className="mb-6 flex flex-col items-center text-center">
             {business.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={business.logo_url}
                 alt={business.nome_loja}
+                width={64}
+                height={64}
+                priority
                 className="mb-3 size-16 rounded-full object-cover"
               />
             ) : null}
