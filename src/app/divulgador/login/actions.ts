@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { divulgadorLoginSchema } from "@/lib/validations/divulgador";
 import { verifyPassword, createDivulgadorSession } from "@/lib/divulgador/auth";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit";
 
 export type LoginDivulgadorResult = { ok: true } | { ok: false; error: string };
 
@@ -10,6 +11,11 @@ export async function loginDivulgadorAction(input: {
   email: string;
   senha: string;
 }): Promise<LoginDivulgadorResult> {
+  const dentroDoLimite = await checkRateLimit("divulgador_login", { windowSeconds: 15 * 60, maxAttempts: 10 });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
   const parsed = divulgadorLoginSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Confira os dados informados." };

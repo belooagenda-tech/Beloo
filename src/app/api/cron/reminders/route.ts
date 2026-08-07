@@ -4,6 +4,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToClient } from "@/lib/push/send-push";
 import { notifyProfessional } from "@/lib/push/notify";
+import { logError } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,12 @@ async function sendClientReminders(admin: ReturnType<typeof createAdminClient>, 
   const businessById = new Map((businesses ?? []).map((b) => [b.id, b]));
   const serviceById = new Map((services ?? []).map((s) => [s.id, s]));
 
-  let enviados = 0;
+  // IDs marcados ao final, num único UPDATE em lote — antes eram N updates
+  // sequenciais (1 por agendamento). Em volume alto de negócios/agendamentos
+  // simultâneos isso reduz bastante o tempo total do cron (achado 🟠 da
+  // auditoria de 2026-08-07: crons não foram desenhados para escalar via
+  // loop com 1 query por linha).
+  const idsProcessados: string[] = [];
 
   for (const appointment of upcoming) {
     const business = businessById.get(appointment.business_id);
@@ -54,19 +60,43 @@ async function sendClientReminders(admin: ReturnType<typeof createAdminClient>, 
       // a cada execução do cron por causa de uma falha pontual de envio.
     }
 
+    idsProcessados.push(appointment.id);
+  }
+
+  if (idsProcessados.length > 0) {
     await admin
       .from("appointments")
       .update({ client_reminder_sent_at: now.toISOString() })
-      .eq("id", appointment.id);
-    enviados++;
+      .in("id", idsProcessados);
   }
 
-  return enviados;
+  return idsProcessados.length;
 }
 
 async function sendProfessionalDayStartReminders(admin: ReturnType<typeof createAdminClient>, now: Date) {
   const { data: businesses } = await admin.from("businesses").select("id, profile_id, timezone");
   if (!businesses || businesses.length === 0) return 0;
+
+  // Uma única query para "lembrete_dia já enviado" de todos os negócios, em
+  // vez de 1 consulta por negócio dentro do loop (achado 🟠 da auditoria de
+  // 2026-08-07 — reduz pela metade os round-trips ao banco nesse cron). A
+  // janela de 24h é generosa o bastante para cobrir o início do dia de
+  // qualquer timezone suportado; o filtro exato por negócio continua sendo
+  // feito em memória, comparando com o `inicioDoDia` de cada um.
+  const profileIds = businesses.map((b) => b.profile_id);
+  const { data: lembretesRecentes } = await admin
+    .from("notifications")
+    .select("profile_id, created_at")
+    .in("profile_id", profileIds)
+    .eq("tipo", "lembrete_dia")
+    .gte("created_at", addHours(now, -24).toISOString());
+
+  const enviadosPorPerfil = new Map<string, Date[]>();
+  for (const n of lembretesRecentes ?? []) {
+    const lista = enviadosPorPerfil.get(n.profile_id) ?? [];
+    lista.push(new Date(n.created_at));
+    enviadosPorPerfil.set(n.profile_id, lista);
+  }
 
   let enviados = 0;
 
@@ -92,15 +122,10 @@ async function sendProfessionalDayStartReminders(admin: ReturnType<typeof create
     const janela = addHours(now, PROFESSIONAL_DAY_START_REMINDER_HOURS_BEFORE);
     if (inicioPrimeiro < now || inicioPrimeiro > janela) continue;
 
-    const { data: jaEnviado } = await admin
-      .from("notifications")
-      .select("id")
-      .eq("profile_id", business.profile_id)
-      .eq("tipo", "lembrete_dia")
-      .gte("created_at", inicioDoDia.toISOString())
-      .maybeSingle();
-
-    if (jaEnviado) continue;
+    const jaEnviadoHoje = (enviadosPorPerfil.get(business.profile_id) ?? []).some(
+      (criadoEm) => criadoEm >= inicioDoDia,
+    );
+    if (jaEnviadoHoje) continue;
 
     const horario = formatInTimeZone(inicioPrimeiro, business.timezone, "HH:mm");
     try {
@@ -114,7 +139,7 @@ async function sendProfessionalDayStartReminders(admin: ReturnType<typeof create
     } catch (err) {
       // Uma falha pontual (ex.: push de um profissional) não pode abortar
       // o loop e deixar os demais negócios sem lembrete nesse ciclo do cron.
-      console.error("Beloo: falha ao enviar lembrete de início de dia", business.id, err);
+      logError("cron.reminders.lembrete_dia", err, { businessId: business.id });
       continue;
     }
     enviados++;
@@ -124,12 +149,17 @@ async function sendProfessionalDayStartReminders(admin: ReturnType<typeof create
 }
 
 export async function GET(request: Request) {
+  // Fail-closed: sem CRON_SECRET configurado, a rota nunca roda — evita que
+  // uma env var esquecida deixe o endpoint público sem autenticação
+  // (achado 🟠 da auditoria de 2026-08-07).
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${secret}`) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+  if (!secret) {
+    console.error("Beloo: CRON_SECRET não configurado — recusando /api/cron/reminders");
+    return new NextResponse("Not configured", { status: 500 });
+  }
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${secret}`) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
   const admin = createAdminClient();

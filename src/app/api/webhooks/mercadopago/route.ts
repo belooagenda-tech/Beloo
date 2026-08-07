@@ -6,6 +6,7 @@ import { verifyWebhookSignature } from "@/lib/mercadopago/webhook-signature";
 import { getPayment, getPreapproval, platformAccessToken } from "@/lib/mercadopago/client";
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { notifyProfessional } from "@/lib/push/notify";
+import { logError } from "@/lib/logger";
 import type { Database } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,10 @@ async function handleAppointmentDeposit(admin: Admin, appointmentId: string, dat
     return new NextResponse("No Mercado Pago connection", { status: 409 });
   }
 
-  const payment = await getPayment(accessToken, dataId).catch(() => null);
+  const payment = await getPayment(accessToken, dataId).catch((err) => {
+    logError("mp_webhook.entrada.consultar_pagamento", err, { appointmentId, dataId });
+    return null;
+  });
   if (!payment || payment.externalReference !== appointment.id) {
     return new NextResponse("Payment mismatch", { status: 400 });
   }

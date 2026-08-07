@@ -287,6 +287,23 @@ export type ComissaoRegistro = {
   criado_em: string;
 };
 
+export type RateLimitHit = {
+  chave: string;
+  janela: string;
+  tentativas: number;
+};
+
+export type ErrorLog = {
+  id: string;
+  scope: string;
+  message: string;
+  business_id: string | null;
+  context: Record<string, unknown>;
+  resolved: boolean;
+  resolved_at: string | null;
+  created_at: string;
+};
+
 type Table<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -318,6 +335,8 @@ export type Database = {
       indicacoes: Table<Indicacao>;
       assinaturas_stripe: Table<AssinaturaStripe>;
       comissoes_registro: Table<ComissaoRegistro>;
+      rate_limit_hits: Table<RateLimitHit>;
+      error_logs: Table<ErrorLog>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -338,6 +357,14 @@ export type Database = {
           p_entrada_valor?: number;
         };
         Returns: { payment_id: string; credito_descontado: boolean }[];
+      };
+      check_rate_limit: {
+        Args: { p_chave: string; p_janela_segundos: number; p_max_tentativas: number };
+        Returns: boolean;
+      };
+      cleanup_old_error_logs: {
+        Args: Record<string, never>;
+        Returns: undefined;
       };
     };
   };

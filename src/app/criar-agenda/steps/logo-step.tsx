@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const MAX_SIZE_MB = 4;
+// Precisa ficar em sincronia com allowed_mime_types do bucket "logos"
+// (supabase/migrations/20260807000001_rate_limit_and_storage_limits.sql) —
+// o Storage já recusa qualquer outro tipo, isso aqui só evita o usuário
+// escolher um arquivo que sabemos que vai falhar.
+const TIPOS_ACEITOS = ["image/png", "image/jpeg", "image/webp"];
 
 export function LogoStep({
   onSubmit,
@@ -32,8 +37,8 @@ export function LogoStep({
       setPreview(null);
       return;
     }
-    if (!selected.type.startsWith("image/")) {
-      setLocalError("Escolha um arquivo de imagem.");
+    if (!TIPOS_ACEITOS.includes(selected.type)) {
+      setLocalError("Escolha uma imagem PNG, JPEG ou WebP.");
       return;
     }
     if (selected.size > MAX_SIZE_MB * 1024 * 1024) {
@@ -77,7 +82,7 @@ export function LogoStep({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={TIPOS_ACEITOS.join(",")}
         className="hidden"
         onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
       />

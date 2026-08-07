@@ -16,16 +16,34 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://beloo.app";
+const TITLE_PADRAO = "Beloo — Agenda online para profissionais";
+const DESCRICAO_PADRAO =
+  "Configure sua agenda, compartilhe seu link e receba agendamentos. O jeito simples de organizar seu dia a dia.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Beloo — Agenda online para profissionais",
+    default: TITLE_PADRAO,
     template: "%s · Beloo",
   },
-  description:
-    "Configure sua agenda, compartilhe seu link e receba agendamentos. O jeito simples de organizar seu dia a dia.",
+  description: DESCRICAO_PADRAO,
   manifest: "/manifest.json",
   icons: {
     apple: "/icons/apple-touch-icon.png",
+  },
+  openGraph: {
+    title: TITLE_PADRAO,
+    description: DESCRICAO_PADRAO,
+    url: SITE_URL,
+    siteName: "Beloo",
+    locale: "pt_BR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE_PADRAO,
+    description: DESCRICAO_PADRAO,
   },
 };
 

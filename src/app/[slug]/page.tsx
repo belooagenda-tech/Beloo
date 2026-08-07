@@ -4,6 +4,14 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicBookingFlow } from "./public-booking-flow";
 
+// Dados de negócio/serviços/planos mudam pouco e essa é a página pública
+// mais visitada do produto — cachear por 30s tira carga do Supabase sem
+// impacto perceptível para quem edita o catálogo (achado 🟡 da auditoria de
+// 2026-08-07). A disponibilidade de horários continua 100% dinâmica: é
+// buscada à parte, via Server Action, no client (ver public-booking-flow.tsx
+// / getAvailableSlotsAction), não fica presa a este cache.
+export const revalidate = 30;
+
 const getPublicBusiness = cache(async (slug: string) => {
   const supabase = createAdminClient();
   const { data: business } = await supabase
@@ -40,7 +48,15 @@ export async function generateMetadata({
   const data = await getPublicBusiness(slug);
   if (!data) notFound();
 
-  return { title: `Agendar com ${data.business.nome_loja}` };
+  const title = `Agendar com ${data.business.nome_loja}`;
+  const description = `Agende seu horário com ${data.business.nome_loja} pela Beloo — escolha o serviço e o melhor horário em poucos toques.`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "website" },
+    twitter: { card: "summary_large_image", title, description },
+  };
 }
 
 export default async function PublicBookingPage({

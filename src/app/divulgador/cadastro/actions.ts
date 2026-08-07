@@ -8,6 +8,7 @@ import {
   createDivulgadorSession,
 } from "@/lib/divulgador/auth";
 import { createExpressAccount, createAccountOnboardingLink } from "@/lib/stripe/client";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit";
 
 export type RegisterDivulgadorResult =
   | { ok: true; onboardingUrl: string }
@@ -35,6 +36,11 @@ export async function registerDivulgadorAction(input: {
   email: string;
   senha: string;
 }): Promise<RegisterDivulgadorResult> {
+  const dentroDoLimite = await checkRateLimit("divulgador_cadastro", { windowSeconds: 60 * 60, maxAttempts: 5 });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
   const parsed = divulgadorCadastroSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Confira os dados informados." };

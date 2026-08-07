@@ -1,20 +1,35 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyProfessional } from "@/lib/push/notify";
+import { logError } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // Fail-closed: sem CRON_SECRET configurado, a rota nunca roda (achado 🟠
+  // da auditoria de 2026-08-07).
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${secret}`) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+  if (!secret) {
+    console.error("Beloo: CRON_SECRET não configurado — recusando /api/cron/expire-entradas");
+    return new NextResponse("Not configured", { status: 500 });
+  }
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${secret}`) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
   const admin = createAdminClient();
   const now = new Date().toISOString();
+
+  // Faxina de logs antigos (error_logs) — não precisa rodar a cada 15min
+  // junto com o resto deste cron, então só dispara 1x por dia (na primeira
+  // execução depois da meia-noite UTC).
+  if (new Date().getUTCHours() === 3) {
+    const { error: cleanupError } = await admin.rpc("cleanup_old_error_logs");
+    if (cleanupError) {
+      logError("cron.expire_entradas.cleanup_logs", cleanupError);
+    }
+  }
 
   const { data: expirados } = await admin
     .from("appointments")
@@ -41,7 +56,7 @@ export async function GET(request: Request) {
         url: "/app/agenda",
       });
     } catch (err) {
-      console.error("Beloo: falha ao notificar expiração de entrada", appointment.id, err);
+      logError("cron.expire_entradas.notificar", err, { appointmentId: appointment.id });
     }
   }
 

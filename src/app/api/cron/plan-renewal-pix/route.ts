@@ -5,16 +5,21 @@ import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { createPreference } from "@/lib/mercadopago/client";
 import { sendPushToClient } from "@/lib/push/send-push";
 import { PLANO_PIX_LEMBRETE_DIAS_ANTES } from "@/lib/constants";
+import { logError } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // Fail-closed: sem CRON_SECRET configurado, a rota nunca roda (achado 🟠
+  // da auditoria de 2026-08-07).
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${secret}`) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+  if (!secret) {
+    console.error("Beloo: CRON_SECRET não configurado — recusando /api/cron/plan-renewal-pix");
+    return new NextResponse("Not configured", { status: 500 });
+  }
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${secret}`) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
   const admin = createAdminClient();
@@ -100,7 +105,7 @@ export async function GET(request: Request) {
 
       linksGerados++;
     } catch (err) {
-      console.error("Beloo: falha ao gerar cobrança Pix de renovação de plano", err);
+      logError("cron.plan_renewal_pix.gerar_cobranca", err, { planSubId: sub.id });
     }
 
     if (venceu) {

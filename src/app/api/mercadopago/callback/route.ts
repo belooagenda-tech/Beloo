@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyState } from "@/lib/mercadopago/state";
 import { exchangeCodeForToken } from "@/lib/mercadopago/client";
+import { encryptSecret } from "@/lib/crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,8 @@ export async function GET(request: Request) {
         business_id: businessId,
         mp_user_id: tokens.userId,
         mp_email: mpEmail,
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
+        access_token: encryptSecret(tokens.accessToken),
+        refresh_token: encryptSecret(tokens.refreshToken),
         public_key: tokens.publicKey,
         token_expires_at: new Date(Date.now() + tokens.expiresInSeconds * 1000).toISOString(),
       },

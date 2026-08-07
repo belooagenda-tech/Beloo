@@ -1,14 +1,19 @@
-const CACHE_NAME = "beloo-shell-v1";
+const CACHE_NAME = "beloo-shell-v2";
 const OFFLINE_URL = "/offline";
 const SHELL_URLS = ["/", OFFLINE_URL, "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL_URLS))
-      .then(() => self.skipWaiting()),
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)));
+  // Sem self.skipWaiting() aqui de propósito: um Service Worker novo fica
+  // "waiting" até o client mandar SKIP_WAITING (ver listener de "message"
+  // abaixo e register-service-worker.tsx) — assim o usuário só troca de
+  // versão quando escolhe "Atualizar" no toast, nunca no meio de uma ação.
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("activate", (event) => {

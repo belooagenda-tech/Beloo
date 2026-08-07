@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOwnProfile } from "@/lib/supabase/session";
@@ -30,10 +31,12 @@ function formatarData(iso: string | null) {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
 
+const PROFISSIONAIS_PAGE_SIZE = 50;
+
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodoComissoes?: string }>;
+  searchParams: Promise<{ periodoComissoes?: string; pagina?: string }>;
 }) {
   const profile = await getOwnProfile();
   if (!profile?.is_admin) {
@@ -48,15 +51,26 @@ export default async function AdminPage({
     .limit(1)
     .maybeSingle();
 
-  const [{ data: businesses }, { data: subscriptions }] = await Promise.all([
+  const { pagina: paginaParam } = await searchParams;
+  // Lista de profissionais paginada — sem isso, a página fica cada vez mais
+  // pesada conforme a base cresce (achado 🟡 da auditoria de 2026-08-07:
+  // essa era a única listagem "de negócio" sem paginação no produto).
+  const pagina = Math.max(1, Number(paginaParam) || 1);
+  const inicio = (pagina - 1) * PROFISSIONAIS_PAGE_SIZE;
+  const fim = inicio + PROFISSIONAIS_PAGE_SIZE - 1;
+
+  const [{ data: businesses, count: totalBusinesses }, { data: subscriptions }] = await Promise.all([
     admin
       .from("businesses")
-      .select("id, nome_loja, slug, profile_id")
-      .order("nome_loja", { ascending: true }),
+      .select("id, nome_loja, slug, profile_id", { count: "exact" })
+      .order("nome_loja", { ascending: true })
+      .range(inicio, fim),
     admin
       .from("saas_subscriptions")
       .select("business_id, status, trial_ends_at, current_period_end"),
   ]);
+
+  const totalPaginas = Math.max(1, Math.ceil((totalBusinesses ?? 0) / PROFISSIONAIS_PAGE_SIZE));
 
   const profileIds = [...new Set((businesses ?? []).map((b) => b.profile_id))];
   const { data: profiles } =
@@ -155,13 +169,31 @@ export default async function AdminPage({
     criadoEm: c.criado_em,
   }));
 
+  const { count: logsNaoResolvidos } = await admin
+    .from("error_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("resolved", false);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground">Admin</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Controle a cobrança da Beloo e acompanhe as assinaturas dos profissionais.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold text-foreground">Admin</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Controle a cobrança da Beloo e acompanhe as assinaturas dos profissionais.
+          </p>
+        </div>
+        <Link
+          href="/app/admin/logs"
+          className="flex shrink-0 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+        >
+          Logs
+          {logsNaoResolvidos ? (
+            <Badge className="bg-destructive/15 text-destructive" variant="secondary">
+              {logsNaoResolvidos}
+            </Badge>
+          ) : null}
+        </Link>
       </div>
 
       <BillingSettingsCard
@@ -173,7 +205,7 @@ export default async function AdminPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Profissionais ({linhas.length})</CardTitle>
+          <CardTitle className="text-base">Profissionais ({totalBusinesses ?? linhas.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {linhas.length === 0 ? (
@@ -225,6 +257,33 @@ export default async function AdminPage({
               </table>
             </div>
           )}
+          {totalPaginas > 1 ? (
+            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                Página {pagina} de {totalPaginas}
+              </span>
+              <div className="flex gap-2">
+                <Link
+                  href={`/app/admin?pagina=${pagina - 1}`}
+                  aria-disabled={pagina <= 1}
+                  className={`rounded-md border border-border px-3 py-1.5 ${
+                    pagina <= 1 ? "pointer-events-none opacity-40" : "hover:bg-accent"
+                  }`}
+                >
+                  Anterior
+                </Link>
+                <Link
+                  href={`/app/admin?pagina=${pagina + 1}`}
+                  aria-disabled={pagina >= totalPaginas}
+                  className={`rounded-md border border-border px-3 py-1.5 ${
+                    pagina >= totalPaginas ? "pointer-events-none opacity-40" : "hover:bg-accent"
+                  }`}
+                >
+                  Próxima
+                </Link>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  lint-typecheck-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Testes
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Valores fictícios só para o build passar no CI — nenhuma chamada de
+          # rede de verdade acontece durante `next build` (as env vars reais
+          # ficam nos Environment Variables do projeto na Vercel).
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+          NEXT_PUBLIC_SITE_URL: https://ci-placeholder.example.com
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ci-placeholder
+          VAPID_PRIVATE_KEY: ci-placeholder
+          VAPID_SUBJECT: mailto:ci@example.com
+          CRON_SECRET: ci-placeholder
+          MERCADO_PAGO_CLIENT_ID: ci-placeholder
+          MERCADO_PAGO_CLIENT_SECRET: ci-placeholder
+          MERCADO_PAGO_STATE_SECRET: ci-placeholder
+          MERCADO_PAGO_WEBHOOK_SECRET: ci-placeholder
+          MERCADO_PAGO_PLATFORM_ACCESS_TOKEN: ci-placeholder
+          MP_TOKEN_ENCRYPTION_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+          STRIPE_SECRET_KEY: sk_test_ci-placeholder
+          STRIPE_WEBHOOK_SECRET: whsec_ci-placeholder

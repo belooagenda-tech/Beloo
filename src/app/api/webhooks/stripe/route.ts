@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { constructWebhookEvent, stripe } from "@/lib/stripe/client";
+import { logError } from "@/lib/logger";
 import type { Database } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -196,7 +197,7 @@ export async function POST(request: Request) {
   try {
     event = constructWebhookEvent(payload, signature);
   } catch (err) {
-    console.error("Beloo: assinatura inválida no webhook da Stripe", err);
+    logError("stripe_webhook.assinatura_invalida", err);
     return new NextResponse("Invalid signature", { status: 401 });
   }
 

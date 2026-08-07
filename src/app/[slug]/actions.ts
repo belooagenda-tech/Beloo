@@ -10,6 +10,8 @@ import { notifyProfessional } from "@/lib/push/notify";
 import { ENTRADA_EXPIRACAO_MINUTOS } from "@/lib/constants";
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { createPreference, refundPayment } from "@/lib/mercadopago/client";
+import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit";
+import { logError } from "@/lib/logger";
 import type { AppointmentStatus } from "@/lib/supabase/types";
 
 export async function findClientNameByPhoneAction(
@@ -17,6 +19,11 @@ export async function findClientNameByPhoneAction(
   telefone: string,
 ): Promise<{ nome: string } | null> {
   if (!isValidBrazilianPhone(telefone)) return null;
+
+  // Busca por telefone revela se um número está cadastrado como cliente —
+  // limita tentativas de varredura (achado 🔴 da auditoria de 2026-08-07).
+  const dentroDoLimite = await checkRateLimit("public_find_client", { windowSeconds: 10 * 60, maxAttempts: 20 });
+  if (!dentroDoLimite) return null;
 
   const supabase = createAdminClient();
   const { data: business } = await supabase
@@ -94,6 +101,11 @@ export async function subscribeClientPushByPhoneAction(
     return { ok: false, error: "Telefone inválido." };
   }
 
+  const dentroDoLimite = await checkRateLimit("public_push_subscribe", { windowSeconds: 10 * 60, maxAttempts: 20 });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
   const supabase = createAdminClient();
   const { data: business } = await supabase
     .from("businesses")
@@ -148,6 +160,11 @@ export async function createAppointmentAction(input: {
   // erro genérico de sempre, sem revelar que foi detectado como bot.
   if (input.empresa) {
     return { ok: false, error: "Não foi possível concluir o agendamento. Tente novamente." };
+  }
+
+  const dentroDoLimite = await checkRateLimit("public_create_appointment", { windowSeconds: 15 * 60, maxAttempts: 15 });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
   }
 
   const parsed = clientInfoSchema.safeParse({ nome: input.nome, telefone: input.telefone });
@@ -231,7 +248,9 @@ export async function createAppointmentAction(input: {
       // Loja marcou entrada ativa mas a conexão do Mercado Pago sumiu (ex.:
       // token revogado externamente) — não trava o cliente, só segue sem
       // cobrar entrada e avisa no log do servidor para o time investigar.
-      console.error(`Beloo: entrada ativa sem conexão MP válida para business ${business.id}`);
+      logError("public_booking.entrada_sem_conexao_mp", new Error("Conexão MP ausente/inválida"), {
+        businessId: business.id,
+      });
     }
   }
   const cobrarEntrada = requerEntrada && entradaAccessToken;
@@ -288,7 +307,10 @@ export async function createAppointmentAction(input: {
 
       return { ok: true, appointmentId: appointment.id, pagamentoUrl: preference.initPoint };
     } catch (err) {
-      console.error("Beloo: falha ao criar preferência Mercado Pago", err);
+      logError("public_booking.criar_preferencia_mp", err, {
+        businessId: business.id,
+        appointmentId: appointment.id,
+      });
       // Libera o horário — sem link de pagamento não há como o cliente
       // confirmar esse agendamento.
       await supabase.from("appointments").delete().eq("id", appointment.id);
@@ -335,6 +357,11 @@ export async function findAppointmentsAction(
 ): Promise<FindAppointmentsResult> {
   if (!isValidBrazilianPhone(telefone)) {
     return { ok: false, error: "Informe um WhatsApp válido com DDD." };
+  }
+
+  const dentroDoLimite = await checkRateLimit("public_find_appointments", { windowSeconds: 10 * 60, maxAttempts: 20 });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
   }
 
   const supabase = createAdminClient();
@@ -391,6 +418,14 @@ export async function cancelAppointmentAction(
   appointmentId: string,
   telefone: string,
 ): Promise<CancelAppointmentResult> {
+  // O telefone é o único fator de confirmação nesse fluxo público — sem
+  // limite de tentativas, dá pra varrer números até acertar um cliente real
+  // (achado 🔴 da auditoria de 2026-08-07).
+  const dentroDoLimite = await checkRateLimit("public_cancel_appointment", { windowSeconds: 15 * 60, maxAttempts: 10 });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
   const supabase = createAdminClient();
   const telefoneNormalizado = normalizePhone(telefone);
 
@@ -452,7 +487,10 @@ export async function cancelAppointmentAction(
       // entrada para não aparecer mais como faturado na aba Financeiro.
       await supabase.from("appointment_payments").delete().eq("appointment_id", appointmentId);
     } catch (err) {
-      console.error("Beloo: falha ao reembolsar entrada automaticamente", err);
+      logError("public_booking.reembolso_automatico", err, {
+        businessId: business.id,
+        appointmentId,
+      });
       avisoReembolso = " O reembolso automático da entrada falhou — verifique manualmente no Mercado Pago.";
     }
   }
