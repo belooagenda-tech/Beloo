@@ -141,6 +141,20 @@
   --sidebar-ring: #8B5CF6;
 }
 
+/* Usada pela BootSplash (src/components/pwa/boot-splash.tsx) enquanto o
+   layout autenticado de /app resolve auth + dados. */
+@keyframes boot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.7;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
