@@ -28,6 +28,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+function formatarPreco(preco: number) {
+  return preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export function MyAppointmentsLookup({ slug, timezone }: { slug: string; timezone: string }) {
   const [telefone, setTelefone] = useState("");
   const [buscando, setBuscando] = useState(false);
@@ -124,6 +128,14 @@ export function MyAppointmentsLookup({ slug, timezone }: { slug: string; timezon
                           )}{" "}
                           às {formatInTimeZone(new Date(agendamento.inicio), timezone, "HH:mm")}
                         </p>
+                        {agendamento.entradaPaga > 0 ? (
+                          <p className="mt-0.5 text-xs font-medium text-success">
+                            Pago: {formatarPreco(agendamento.entradaPaga)}
+                            {agendamento.restanteAPagar > 0
+                              ? ` — falta ${formatarPreco(agendamento.restanteAPagar)} no local`
+                              : " — valor total já quitado"}
+                          </p>
+                        ) : null}
                       </div>
                       {agendamento.podeCancelar ? (
                         <Button

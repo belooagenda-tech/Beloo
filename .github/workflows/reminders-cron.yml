@@ -27,3 +27,9 @@ jobs:
           curl -sf -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.CRON_TARGET_URL }}/api/cron/plan-renewal-pix"
+      - name: Chamar /api/cron/saas-billing-reminders
+        if: always()
+        run: |
+          curl -sf -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.CRON_TARGET_URL }}/api/cron/saas-billing-reminders"

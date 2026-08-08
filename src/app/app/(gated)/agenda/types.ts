@@ -41,3 +41,13 @@ export type AgendaPayment = {
   origem: OrigemPagamento;
   entrada_valor: number | null;
 };
+
+// Plano ativo do cliente (no máx. 1 por cliente) — carregado junto com a
+// Agenda pra mostrar "esse cliente tem plano tal" direto no card, sem
+// esperar o profissional abrir "Concluir e receber" pra descobrir.
+export type AgendaClientPlan = {
+  clientId: string;
+  planoNome: string;
+  creditosUsados: Record<string, number>;
+  servicosInclusos: { service_id: string; quantidade: number | null }[];
+};

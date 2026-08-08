@@ -10,7 +10,7 @@ import { AppointmentCard } from "./appointment-card";
 import { PaymentModal } from "./payment-modal";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { cancelAppointmentFromAgendaAction } from "./actions";
-import type { AgendaAppointment, AgendaClient, AgendaPayment, AgendaService } from "./types";
+import type { AgendaAppointment, AgendaClient, AgendaClientPlan, AgendaPayment, AgendaService } from "./types";
 
 export function AgendaDayView({
   businessId,
@@ -21,6 +21,7 @@ export function AgendaDayView({
   appointments: appointmentsIniciais,
   clients: clientsIniciais,
   payments: paymentsIniciais,
+  clientPlans,
 }: {
   businessId: string;
   timezone: string;
@@ -31,6 +32,7 @@ export function AgendaDayView({
   appointments: AgendaAppointment[];
   clients: AgendaClient[];
   payments: AgendaPayment[];
+  clientPlans: AgendaClientPlan[];
 }) {
   const [appointments, setAppointments] = useState(appointmentsIniciais);
   const [clients, setClients] = useState(clientsIniciais);
@@ -43,6 +45,10 @@ export function AgendaDayView({
   const paymentsByAppointment = useMemo(
     () => new Map(payments.map((p) => [p.appointment_id, p])),
     [payments],
+  );
+  const clientPlanByClient = useMemo(
+    () => new Map(clientPlans.map((p) => [p.clientId, p])),
+    [clientPlans],
   );
 
   async function updateStatus(id: string, status: AgendaAppointment["status"]) {
@@ -146,6 +152,7 @@ export function AgendaDayView({
                 service={servicesById.get(appointment.service_id)}
                 client={clientsById.get(appointment.client_id)}
                 payment={paymentsByAppointment.get(appointment.id)}
+                clientPlan={clientPlanByClient.get(appointment.client_id)}
                 timezone={timezone}
                 onConfirm={() => updateStatus(appointment.id, "confirmado")}
                 onCancel={() => handleCancel(appointment.id)}

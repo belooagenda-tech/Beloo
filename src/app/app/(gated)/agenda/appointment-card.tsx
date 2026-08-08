@@ -12,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { AgendaAppointment, AgendaClient, AgendaPayment, AgendaService } from "./types";
+import { evaluatePlanCoverage } from "@/lib/booking/plan-coverage";
+import type { AgendaAppointment, AgendaClient, AgendaClientPlan, AgendaPayment, AgendaService } from "./types";
 
 const STATUS_META: Record<
   AgendaAppointment["status"],
@@ -35,6 +36,7 @@ export function AppointmentCard({
   service,
   client,
   payment,
+  clientPlan,
   timezone,
   onConfirm,
   onCancel,
@@ -45,6 +47,7 @@ export function AppointmentCard({
   service: AgendaService | undefined;
   client: AgendaClient | undefined;
   payment: AgendaPayment | undefined;
+  clientPlan: AgendaClientPlan | undefined;
   timezone: string;
   onConfirm: () => void;
   onCancel: () => void;
@@ -53,6 +56,18 @@ export function AppointmentCard({
 }) {
   const status = STATUS_META[appointment.status];
   const podeAgir = appointment.status === "agendado" || appointment.status === "confirmado";
+
+  // Mostra o plano do cliente ANTES de concluir o atendimento, pra ajudar o
+  // profissional a decidir como cobrar — depois de concluído, essa mesma
+  // informação já vem embutida no `payment` (origem: "plano").
+  const coverage =
+    clientPlan && service && appointment.status !== "concluido" && appointment.status !== "cancelado"
+      ? evaluatePlanCoverage(
+          { servicos_inclusos: clientPlan.servicosInclusos },
+          { creditos_usados: clientPlan.creditosUsados },
+          service.id,
+        )
+      : null;
 
   // Entrada paga via Mercado Pago mas atendimento ainda não concluído — o
   // profissional precisa ver isso na Agenda, senão cobra o valor cheio de
@@ -84,6 +99,24 @@ export function AppointmentCard({
             </Badge>
           </div>
           <p className="truncate text-sm text-foreground">{client?.nome ?? "Cliente"}</p>
+          {clientPlan && coverage ? (
+            <p className="mt-0.5 truncate text-xs">
+              {coverage.covered ? (
+                <span className="font-medium text-success">
+                  Tem o plano {clientPlan.planoNome} · cobre este serviço
+                  {coverage.limite !== null ? ` (${coverage.usados}/${coverage.limite} usados)` : ""}
+                </span>
+              ) : coverage.motivo === "sem_creditos" ? (
+                <span className="font-medium text-warning">
+                  Tem o plano {clientPlan.planoNome} · sem créditos deste serviço no ciclo
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  Tem o plano {clientPlan.planoNome} · não cobre este serviço
+                </span>
+              )}
+            </p>
+          ) : null}
           <p className="truncate text-sm text-muted-foreground">
             {service?.nome ?? "Serviço"}
             {payment ? (

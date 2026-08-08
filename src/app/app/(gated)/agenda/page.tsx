@@ -42,7 +42,7 @@ export default async function AgendaPage({
   const clientIds = [...new Set((appointments ?? []).map((a) => a.client_id))];
   const appointmentIds = (appointments ?? []).map((a) => a.id);
 
-  const [{ data: clients }, { data: payments }] = await Promise.all([
+  const [{ data: clients }, { data: payments }, { data: activeSubs }] = await Promise.all([
     clientIds.length > 0
       ? supabase.from("clients").select("id, nome, telefone").in("id", clientIds)
       : Promise.resolve({ data: [] }),
@@ -52,7 +52,37 @@ export default async function AgendaPage({
           .select("id, appointment_id, valor, forma_pagamento, origem, entrada_valor")
           .in("appointment_id", appointmentIds)
       : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase
+          .from("client_plan_subs")
+          .select("client_id, plan_id, creditos_usados")
+          .eq("ativo", true)
+          .in("client_id", clientIds)
+      : Promise.resolve({ data: [] }),
   ]);
+
+  // Plano ativo de cada cliente que apareceu na Agenda hoje — igual ao
+  // padrão do resto da página, monta um mapa em memória em vez de 1 query
+  // por cliente dentro do componente.
+  const planIds = [...new Set((activeSubs ?? []).map((s) => s.plan_id))];
+  const { data: plans } =
+    planIds.length > 0
+      ? await supabase.from("client_plans").select("id, nome, servicos_inclusos").in("id", planIds)
+      : { data: [] };
+  const planById = new Map((plans ?? []).map((p) => [p.id, p]));
+
+  const clientPlans = (activeSubs ?? []).flatMap((sub) => {
+    const plan = planById.get(sub.plan_id);
+    if (!plan) return [];
+    return [
+      {
+        clientId: sub.client_id,
+        planoNome: plan.nome,
+        creditosUsados: sub.creditos_usados,
+        servicosInclusos: plan.servicos_inclusos,
+      },
+    ];
+  });
 
   return (
     <AgendaDayView
@@ -66,6 +96,7 @@ export default async function AgendaPage({
       appointments={appointments ?? []}
       clients={clients ?? []}
       payments={payments ?? []}
+      clientPlans={clientPlans}
     />
   );
 }

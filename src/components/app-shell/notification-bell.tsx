@@ -19,6 +19,7 @@ const DESTINO_POR_TIPO: Record<Notification["tipo"], string> = {
   entrada_paga: "/app/agenda",
   lembrete_dia: "/app/agenda",
   plano_pago: "/app/clientes",
+  assinatura_expirando: "/app/assinatura",
 };
 
 function formatarRelativo(iso: string) {

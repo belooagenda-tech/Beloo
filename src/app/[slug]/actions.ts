@@ -318,6 +318,8 @@ export type PublicAppointmentSummary = {
   inicio: string;
   status: AppointmentStatus;
   podeCancelar: boolean;
+  entradaPaga: number;
+  restanteAPagar: number;
 };
 
 export type FindAppointmentsResult =
@@ -357,7 +359,7 @@ export async function findAppointmentsAction(
 
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("id, service_id, inicio, status")
+    .select("id, service_id, inicio, status, entrada_status, entrada_valor")
     .eq("client_id", client.id)
     .in("status", ["agendado", "confirmado"])
     .gt("inicio", new Date().toISOString())
@@ -366,20 +368,27 @@ export async function findAppointmentsAction(
   const serviceIds = [...new Set((appointments ?? []).map((a) => a.service_id))];
   const { data: services } =
     serviceIds.length > 0
-      ? await supabase.from("services").select("id, nome").in("id", serviceIds)
+      ? await supabase.from("services").select("id, nome, preco").in("id", serviceIds)
       : { data: [] };
-  const servicoNomeById = new Map((services ?? []).map((s) => [s.id, s.nome]));
+  const servicoById = new Map((services ?? []).map((s) => [s.id, s]));
 
   const limiteMs = business.cancelamento_min_horas * 60 * 60_000;
   const agora = Date.now();
 
-  const agendamentos: PublicAppointmentSummary[] = (appointments ?? []).map((a) => ({
-    id: a.id,
-    servicoNome: servicoNomeById.get(a.service_id) ?? "Serviço",
-    inicio: a.inicio,
-    status: a.status,
-    podeCancelar: new Date(a.inicio).getTime() - agora >= limiteMs,
-  }));
+  const agendamentos: PublicAppointmentSummary[] = (appointments ?? []).map((a) => {
+    const service = servicoById.get(a.service_id);
+    const entradaPaga = a.entrada_status === "pago" ? (a.entrada_valor ?? 0) : 0;
+    const restanteAPagar = service ? Math.max(Math.round((service.preco - entradaPaga) * 100) / 100, 0) : 0;
+    return {
+      id: a.id,
+      servicoNome: service?.nome ?? "Serviço",
+      inicio: a.inicio,
+      status: a.status,
+      podeCancelar: new Date(a.inicio).getTime() - agora >= limiteMs,
+      entradaPaga,
+      restanteAPagar,
+    };
+  });
 
   return { ok: true, agendamentos };
 }

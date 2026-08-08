@@ -172,7 +172,8 @@ export type NotificationTipo =
   | "cancelamento"
   | "lembrete_dia"
   | "entrada_paga"
-  | "plano_pago";
+  | "plano_pago"
+  | "assinatura_expirando";
 
 export type Notification = {
   id: string;

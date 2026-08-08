@@ -13,12 +13,20 @@ import { capitalizeFirst } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Agendamento confirmado" };
 
+function formatarPreco(preco: number) {
+  return preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function round2(valor: number) {
+  return Math.round(valor * 100) / 100;
+}
+
 async function getConfirmationData(slug: string, appointmentId: string) {
   const supabase = createAdminClient();
 
   const { data: appointment } = await supabase
     .from("appointments")
-    .select("id, inicio, business_id, service_id, client_id, status, entrada_status")
+    .select("id, inicio, business_id, service_id, client_id, status, entrada_status, entrada_valor")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appointment) return null;
@@ -65,6 +73,9 @@ export default async function ConfirmacaoPage({
 
   const aguardandoPagamento = appointment.status === "aguardando_pagamento";
   const expirado = appointment.status === "cancelado" && appointment.entrada_status === "expirado";
+
+  const entradaPaga = appointment.entrada_status === "pago" ? (appointment.entrada_valor ?? 0) : 0;
+  const restanteAPagar = service ? Math.max(round2(service.preco - entradaPaga), 0) : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-linear-to-b from-secondary/60 via-background to-background">
@@ -133,6 +144,14 @@ export default async function ConfirmacaoPage({
                 <p className="text-sm font-medium text-foreground">
                   {dataFormatada} às {horaFormatada}
                 </p>
+                {entradaPaga > 0 ? (
+                  <p className="text-xs font-medium text-success">
+                    Você já pagou {formatarPreco(entradaPaga)} de entrada
+                    {restanteAPagar > 0
+                      ? ` — falta pagar ${formatarPreco(restanteAPagar)} no local.`
+                      : " — valor total já quitado."}
+                  </p>
+                ) : null}
                 <ClientPushOptIn
                   onSubscribe={subscribeClientPushByAppointmentAction.bind(null, slug, appointmentId)}
                   label="Receber lembrete por notificação"
