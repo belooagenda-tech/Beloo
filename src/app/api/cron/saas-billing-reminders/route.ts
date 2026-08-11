@@ -41,27 +41,12 @@ function mensagem(dias: number, contexto: "trial" | "renovacao") {
   };
 }
 
-export async function GET(request: Request) {
-  // Fail-closed: sem CRON_SECRET configurado, a rota nunca roda (mesmo
-  // padrão dos outros crons — achado 🟠 da auditoria de 2026-08-07).
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    console.error("Beloo: CRON_SECRET não configurado — recusando /api/cron/saas-billing-reminders");
-    return new NextResponse("Not configured", { status: 500 });
-  }
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${secret}`) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
-
-  const admin = createAdminClient();
-  const now = new Date();
-
+export async function runSaasBillingReminders(admin: ReturnType<typeof createAdminClient>, now: Date) {
   const { data: plan } = await admin.from("saas_plans").select("billing_enabled").limit(1).maybeSingle();
   // Cobrança desligada: trial_ends_at/current_period_end não valem nada
   // ainda (ninguém é bloqueado), então não faz sentido avisar de vencimento.
   if (!plan?.billing_enabled) {
-    return NextResponse.json({ ok: true, avisados: 0, motivo: "billing_desativado" });
+    return { avisados: 0, motivo: "billing_desativado" };
   }
 
   const { data: subs } = await admin
@@ -69,7 +54,7 @@ export async function GET(request: Request) {
     .select("id, business_id, status, trial_ends_at, current_period_end, mp_preapproval_status")
     .in("status", ["trial", "ativo"]);
   if (!subs || subs.length === 0) {
-    return NextResponse.json({ ok: true, avisados: 0 });
+    return { avisados: 0 };
   }
 
   const businessIds = subs.map((s) => s.business_id);
@@ -142,5 +127,24 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, avisados });
+  return { avisados };
+}
+
+export async function GET(request: Request) {
+  // Fail-closed: sem CRON_SECRET configurado, a rota nunca roda (mesmo
+  // padrão dos outros crons — achado 🟠 da auditoria de 2026-08-07).
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.error("Beloo: CRON_SECRET não configurado — recusando /api/cron/saas-billing-reminders");
+    return new NextResponse("Not configured", { status: 500 });
+  }
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${secret}`) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  const admin = createAdminClient();
+  const resultado = await runSaasBillingReminders(admin, new Date());
+
+  return NextResponse.json({ ok: true, ...resultado });
 }

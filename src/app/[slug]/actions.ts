@@ -155,6 +155,10 @@ export async function createAppointmentAction(input: {
   nome: string;
   telefone: string;
   empresa?: string;
+  // Preço e nome nunca vêm do cliente — a RPC busca ambos em `products` no
+  // momento da gravação, então um id adulterado só é ignorado, nunca
+  // aceito com um preço diferente do cadastrado.
+  produtos?: { productId: string; quantidade: number }[];
 }): Promise<CreateAppointmentResult> {
   // Campo-armadilha preenchido = formulário automatizado. Devolve o mesmo
   // erro genérico de sempre, sem revelar que foi detectado como bot.
@@ -239,6 +243,9 @@ export async function createAppointmentAction(input: {
     p_entrada_valor: entradaValor,
     p_entrada_expira_em: entradaExpiraEm,
     p_max_agendamentos_futuros: MAX_AGENDAMENTOS_FUTUROS_POR_CLIENTE,
+    p_produtos: (input.produtos ?? [])
+      .filter((p) => p.quantidade > 0)
+      .map((p) => ({ product_id: p.productId, quantidade: p.quantidade })),
   });
 
   if (rpcError || !rpcResult) {

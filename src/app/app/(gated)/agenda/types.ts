@@ -42,6 +42,17 @@ export type AgendaPayment = {
   entrada_valor: number | null;
 };
 
+// Produtos vendidos junto com um agendamento (via vitrine pública) — N por
+// agendamento, exibidos no card e somados ao sugerir o valor a cobrar na
+// conclusão.
+export type AgendaProduct = {
+  id: string;
+  appointment_id: string;
+  nome_snapshot: string;
+  preco_snapshot: number;
+  quantidade: number;
+};
+
 // Bloqueio pontual de horário criado direto na Agenda (ex.: almoço) — mesma
 // tabela `agenda_blocks` também é considerada como ocupado no cálculo de
 // horários livres do agendamento público (ver lib/booking/get-available-slots.ts).

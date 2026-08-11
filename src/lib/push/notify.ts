@@ -33,3 +33,22 @@ export async function notifyProfessional(
     tag: params.tipo,
   });
 }
+
+// Avisa TODOS os admins da plataforma (profiles.is_admin = true) — hoje só
+// usado para "novo profissional se cadastrou" (ver
+// criar-agenda/referral-actions.ts). Poucas contas admin existem, então
+// notificar uma por uma (mesmo caminho de notifyProfessional, sino + push)
+// não precisa de nenhum batching especial.
+export async function notifyAdmins(
+  admin: SupabaseClient<Database>,
+  params: { tipo: NotificationTipo; titulo: string; corpo: string; url?: string },
+) {
+  const { data: admins } = await admin.from("profiles").select("id").eq("is_admin", true);
+  await Promise.all(
+    (admins ?? []).map((a) =>
+      notifyProfessional(admin, { profileId: a.id, ...params }).catch((err) => {
+        console.error("Beloo: falha ao notificar admin", a.id, err);
+      }),
+    ),
+  );
+}

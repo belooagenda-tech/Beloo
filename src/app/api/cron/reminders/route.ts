@@ -8,10 +8,18 @@ import { logError } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-const CLIENT_REMINDER_HOURS_BEFORE = 2;
-const PROFESSIONAL_DAY_START_REMINDER_HOURS_BEFORE = 1;
+// Esse cron roda via GitHub Actions (.github/workflows/reminders-cron.yml,
+// schedule "*/15 * * * *"), não via Vercel Cron — confirmado rodando com
+// sucesso a cada ~15-30min. GitHub documenta que workflows agendados podem
+// atrasar sob carga alta da plataforma (às vezes o intervalo real chega a
+// algumas horas); a janela aqui tem uma margem de segurança sobre o "2h/1h
+// antes" ideal pra não perder ninguém num desses atrasos raros — quem
+// garante "1 lembrete só" de verdade é client_reminder_sent_at / "já
+// enviado hoje", não o tamanho da janela.
+const CLIENT_REMINDER_HOURS_BEFORE = 4;
+const PROFESSIONAL_DAY_START_REMINDER_HOURS_BEFORE = 3;
 
-async function sendClientReminders(admin: ReturnType<typeof createAdminClient>, now: Date) {
+export async function sendClientReminders(admin: ReturnType<typeof createAdminClient>, now: Date) {
   const windowEnd = addHours(now, CLIENT_REMINDER_HOURS_BEFORE);
 
   const { data: upcoming } = await admin
@@ -73,7 +81,7 @@ async function sendClientReminders(admin: ReturnType<typeof createAdminClient>, 
   return idsProcessados.length;
 }
 
-async function sendProfessionalDayStartReminders(admin: ReturnType<typeof createAdminClient>, now: Date) {
+export async function sendProfessionalDayStartReminders(admin: ReturnType<typeof createAdminClient>, now: Date) {
   const { data: businesses } = await admin.from("businesses").select("id, profile_id, timezone");
   if (!businesses || businesses.length === 0) return 0;
 

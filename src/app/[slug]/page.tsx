@@ -22,21 +22,33 @@ const getPublicBusiness = cache(async (slug: string) => {
 
   if (!business) return null;
 
-  const { data: services } = await supabase
-    .from("services")
-    .select("id, nome, duracao_min, preco")
-    .eq("business_id", business.id)
-    .eq("ativo", true)
-    .order("created_at", { ascending: true });
+  // As três consultas abaixo são independentes entre si — rodar em paralelo
+  // em vez de uma atrás da outra corta o tempo de resposta sem tirar nada do
+  // cache de 30s já existente (achado do mesmo tipo do batching já usado em
+  // app/(gated)/agenda/page.tsx).
+  const [{ data: services }, { data: plans }, { data: products }] = await Promise.all([
+    supabase
+      .from("services")
+      .select("id, nome, duracao_min, preco")
+      .eq("business_id", business.id)
+      .eq("ativo", true)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("client_plans")
+      .select("id, nome, valor_mensal, ciclo_dias, servicos_inclusos, permite_pagamento_online")
+      .eq("business_id", business.id)
+      .eq("ativo", true)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("products")
+      .select("id, nome, descricao, preco, imagem_url")
+      .eq("business_id", business.id)
+      .eq("ativo", true)
+      .order("ordem", { ascending: true })
+      .order("created_at", { ascending: true }),
+  ]);
 
-  const { data: plans } = await supabase
-    .from("client_plans")
-    .select("id, nome, valor_mensal, ciclo_dias, servicos_inclusos, permite_pagamento_online")
-    .eq("business_id", business.id)
-    .eq("ativo", true)
-    .order("created_at", { ascending: true });
-
-  return { business, services: services ?? [], plans: plans ?? [] };
+  return { business, services: services ?? [], plans: plans ?? [], products: products ?? [] };
 });
 
 export async function generateMetadata({
@@ -70,6 +82,11 @@ export default async function PublicBookingPage({
   if (!data) notFound();
 
   return (
-    <PublicBookingFlow business={data.business} services={data.services} plans={data.plans} />
+    <PublicBookingFlow
+      business={data.business}
+      services={data.services}
+      plans={data.plans}
+      products={data.products}
+    />
   );
 }

@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthedUser, getOwnBusiness } from "@/lib/supabase/session";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 import { BusinessInfoCard } from "./business-info-card";
+
+// "qrcode" só é necessário nesta página — carregar sob demanda mantém o
+// bundle inicial do resto de /app livre desse peso (mesmo padrão já usado
+// nos gráficos do Financeiro).
+const QrCodeButton = dynamic(() => import("./qr-code-button").then((mod) => mod.QrCodeButton));
 import { SocialLinksCard } from "./social-links-card";
 import { WhatsAppTemplateCard } from "./whatsapp-template-card";
 import { PushNotificationsCard } from "./push-notifications-card";
@@ -51,7 +57,10 @@ export default async function ConfiguracoesPage() {
               {publicUrl.replace(/^https?:\/\//, "")}
             </a>
           </div>
-          <CopyLinkButton url={publicUrl} />
+          <div className="flex items-center gap-2">
+            <QrCodeButton url={publicUrl} nomeLoja={business!.nome_loja} />
+            <CopyLinkButton url={publicUrl} />
+          </div>
         </CardContent>
       </Card>
 

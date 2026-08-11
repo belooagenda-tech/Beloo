@@ -26,6 +26,8 @@ export function ClientInfoForm({
   inicioISO,
   timezone,
   entradaValor,
+  produtosTotal,
+  backLabel = "Trocar horário",
   onSubmit,
   onBack,
   submitting,
@@ -36,6 +38,8 @@ export function ClientInfoForm({
   inicioISO: string;
   timezone: string;
   entradaValor?: number;
+  produtosTotal?: number;
+  backLabel?: string;
   onSubmit: (values: ClientInfoInput) => void;
   onBack: () => void;
   submitting: boolean;
@@ -93,7 +97,7 @@ export function ClientInfoForm({
     <div className="space-y-4">
       <Button type="button" variant="ghost" size="sm" onClick={onBack}>
         <ArrowLeft className="size-4" />
-        Trocar horário
+        {backLabel}
       </Button>
 
       <Card>
@@ -102,10 +106,15 @@ export function ClientInfoForm({
           <p className="text-sm text-muted-foreground">
             {dataFormatada} às {horaFormatada} · {formatarPreco(service.preco)}
           </p>
+          {produtosTotal ? (
+            <p className="text-sm text-muted-foreground">
+              + produtos: {formatarPreco(produtosTotal)} (pago no dia)
+            </p>
+          ) : null}
           {entradaValor ? (
             <p className="mt-2 text-sm font-medium text-primary">
               Entrada de {formatarPreco(entradaValor)} para confirmar · restante{" "}
-              {formatarPreco(service.preco - entradaValor)} no dia
+              {formatarPreco(service.preco - entradaValor + (produtosTotal ?? 0))} no dia
             </p>
           ) : null}
         </CardContent>

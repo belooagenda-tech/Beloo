@@ -10,20 +10,23 @@ import type { ClientInfoInput } from "@/lib/validations/public-booking";
 import { getAvailableSlotsAction, createAppointmentAction } from "./actions";
 import { ServicePicker } from "./service-picker";
 import { DayTimePicker } from "./day-time-picker";
+import { ProductPicker } from "./product-picker";
 import { ClientInfoForm } from "./client-info-form";
 import { PlansSection } from "./plans-section";
-import type { PublicBusiness, PublicPlan, PublicService } from "./types";
+import type { PublicBusiness, PublicPlan, PublicProduct, PublicService } from "./types";
 
-type Step = "servico" | "horario" | "dados";
+type Step = "servico" | "horario" | "produtos" | "dados";
 
 export function PublicBookingFlow({
   business,
   services,
   plans,
+  products,
 }: {
   business: PublicBusiness;
   services: PublicService[];
   plans: PublicPlan[];
+  products: PublicProduct[];
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("servico");
@@ -31,6 +34,9 @@ export function PublicBookingFlow({
   const [slots, setSlots] = useState<Record<string, string[]>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedIso, setSelectedIso] = useState<string | null>(null);
+  // productId -> quantidade. Fica no estado do flow inteiro (não só do step)
+  // pra sobreviver caso o cliente volte pra trocar o horário e volte aqui.
+  const [selectedProducts, setSelectedProducts] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,13 +54,18 @@ export function PublicBookingFlow({
   function handleSelectSlot(iso: string) {
     setSelectedIso(iso);
     setError(null);
-    setStep("dados");
+    setStep(products.length > 0 ? "produtos" : "dados");
   }
 
   async function handleSubmit(values: ClientInfoInput) {
     if (!selectedService || !selectedIso) return;
     setSubmitting(true);
     setError(null);
+
+    const produtosSelecionados = Object.entries(selectedProducts).map(([productId, quantidade]) => ({
+      productId,
+      quantidade,
+    }));
 
     const result = await createAppointmentAction({
       slug: business.slug,
@@ -63,6 +74,7 @@ export function PublicBookingFlow({
       nome: values.nome,
       telefone: values.telefone,
       empresa: values.empresa,
+      produtos: produtosSelecionados,
     });
 
     if (!result.ok) {
@@ -83,6 +95,14 @@ export function PublicBookingFlow({
     business.entrada_ativa && business.entrada_percentual > 0 && selectedService
       ? Math.round(selectedService.preco * business.entrada_percentual) / 100
       : undefined;
+
+  // Produtos ficam de fora do cálculo da entrada de propósito — a entrada
+  // continua sendo só sobre o serviço (mesma regra de sempre); o valor dos
+  // produtos é cobrado junto do restante, no dia do atendimento.
+  const produtosTotal = products.reduce(
+    (acc, p) => acc + (selectedProducts[p.id] ?? 0) * p.preco,
+    0,
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-linear-to-b from-secondary/60 via-background to-background">
@@ -138,6 +158,16 @@ export function PublicBookingFlow({
             />
           ) : null}
 
+          {step === "produtos" && selectedService ? (
+            <ProductPicker
+              products={products}
+              selected={selectedProducts}
+              onChange={setSelectedProducts}
+              onContinue={() => setStep("dados")}
+              onBack={() => setStep("horario")}
+            />
+          ) : null}
+
           {step === "dados" && selectedService && selectedIso ? (
             <ClientInfoForm
               slug={business.slug}
@@ -145,8 +175,10 @@ export function PublicBookingFlow({
               inicioISO={selectedIso}
               timezone={business.timezone}
               entradaValor={entradaValor}
+              produtosTotal={produtosTotal}
+              backLabel={products.length > 0 ? "Ver produtos" : "Trocar horário"}
               onSubmit={handleSubmit}
-              onBack={() => setStep("horario")}
+              onBack={() => setStep(products.length > 0 ? "produtos" : "horario")}
               submitting={submitting}
               error={error}
             />

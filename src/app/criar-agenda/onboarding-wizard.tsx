@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { AccountInput, StoreInput } from "@/lib/validations/onboarding";
 import type { DiaDisponibilidade } from "@/components/availability/types";
 import { Button } from "@/components/ui/button";
-import { linkReferralIfPresentAction } from "./referral-actions";
+import { linkReferralIfPresentAction, notifyAdminsOfNewSignupAction } from "./referral-actions";
 import { WizardProgress } from "./wizard-progress";
 import { AccountStep } from "./steps/account-step";
 import { StoreStep } from "./steps/store-step";
@@ -98,6 +98,8 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
     // Melhor esforço, não bloqueia o wizard: vincula ao divulgador do
     // cookie de indicação, se houver um (ver src/proxy.ts).
     linkReferralIfPresentAction(data.id).catch(() => {});
+    // Idem: avisa os admins da plataforma que um novo profissional entrou.
+    notifyAdminsOfNewSignupAction(data.id).catch(() => {});
     setStep(3);
   }
 

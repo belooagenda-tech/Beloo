@@ -39,12 +39,16 @@ async function getConfirmationData(slug: string, appointmentId: string) {
     .single();
   if (!business || business.slug !== slug) return null;
 
-  const [{ data: service }, { data: client }] = await Promise.all([
+  const [{ data: service }, { data: client }, { data: produtos }] = await Promise.all([
     supabase.from("services").select("nome, preco").eq("id", appointment.service_id).single(),
     supabase.from("clients").select("nome").eq("id", appointment.client_id).single(),
+    supabase
+      .from("appointment_products")
+      .select("id, nome_snapshot, preco_snapshot, quantidade")
+      .eq("appointment_id", appointmentId),
   ]);
 
-  return { appointment, business, service, client };
+  return { appointment, business, service, client, produtos: produtos ?? [] };
 }
 
 export default async function ConfirmacaoPage({
@@ -62,7 +66,8 @@ export default async function ConfirmacaoPage({
   const data = await getConfirmationData(slug, appointmentId);
   if (!data) notFound();
 
-  const { business, service, client, appointment } = data;
+  const { business, service, client, appointment, produtos } = data;
+  const produtosTotal = produtos.reduce((acc, p) => acc + p.preco_snapshot * p.quantidade, 0);
   const dataFormatada = capitalizeFirst(
     new Intl.DateTimeFormat("pt-BR", {
       weekday: "long",
@@ -145,6 +150,12 @@ export default async function ConfirmacaoPage({
                 <p className="text-sm font-medium text-foreground">
                   {dataFormatada} às {horaFormatada}
                 </p>
+                {produtos.length > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    + {produtos.map((p) => `${p.quantidade}× ${p.nome_snapshot}`).join(", ")} (
+                    {formatarPreco(produtosTotal)}, pago no dia)
+                  </p>
+                ) : null}
                 {entradaPaga > 0 ? (
                   <p className="text-xs font-medium text-success">
                     Você já pagou {formatarPreco(entradaPaga)} de entrada

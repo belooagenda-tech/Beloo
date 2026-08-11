@@ -116,6 +116,23 @@ export default async function FinanceiroPage({
   const byService = aggregateByService(paymentsTyped, appointmentServiceMap, servicesById);
   const byFormaPagamento = aggregateByFormaPagamento(paymentsTyped);
 
+  // Produtos vendidos junto de agendamentos já pagos no período (mesmo
+  // recorte de paymentsTyped) — não é um chart novo, só mais um número no
+  // resumo, pra não pesar a página com mais uma query pesada/gráfico.
+  const paymentAppointmentIds = [...new Set(paymentsTyped.map((p) => p.appointment_id))];
+  const { data: produtosVendidosRaw } =
+    paymentAppointmentIds.length > 0
+      ? await supabase
+          .from("appointment_products")
+          .select("preco_snapshot, quantidade")
+          .in("appointment_id", paymentAppointmentIds)
+      : { data: [] };
+  const totalProdutos = (produtosVendidosRaw ?? []).reduce(
+    (acc, p) => acc + p.preco_snapshot * p.quantidade,
+    0,
+  );
+  const itensProdutos = (produtosVendidosRaw ?? []).reduce((acc, p) => acc + p.quantidade, 0);
+
   const totalAvulso = paymentsTyped
     .filter((p) => p.origem === "avulso")
     .reduce((acc, p) => acc + p.valor, 0);
@@ -182,7 +199,7 @@ export default async function FinanceiroPage({
         metaInicial={business!.meta_faturamento_mensal}
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Card>
           <CardContent className="py-4">
             <p className="text-lg font-semibold text-foreground">{formatarPreco(totalAvulso)}</p>
@@ -193,6 +210,14 @@ export default async function FinanceiroPage({
           <CardContent className="py-4">
             <p className="text-lg font-semibold text-foreground">{formatarPreco(totalPlanoReferencia)}</p>
             <p className="text-xs text-muted-foreground">Valor gerado por planos</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-4">
+            <p className="text-lg font-semibold text-foreground">{formatarPreco(totalProdutos)}</p>
+            <p className="text-xs text-muted-foreground">
+              Produtos vendidos{itensProdutos > 0 ? ` (${itensProdutos} itens)` : ""}
+            </p>
           </CardContent>
         </Card>
         <Card>

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { REF_COOKIE_NAME } from "@/lib/divulgador/referral-cookie";
+import { notifyAdmins } from "@/lib/push/notify";
 
 // Vincula o profissional recém-criado ao divulgador do cookie de indicação,
 // se houver um. Nunca bloqueia nem falha visivelmente pro profissional — é
@@ -47,5 +48,27 @@ export async function linkReferralIfPresentAction(businessId: string): Promise<v
   await admin.from("indicacoes").insert({
     divulgador_id: divulgador.id,
     profissional_id: businessId,
+  });
+}
+
+// Avisa os admins da plataforma (sino + push) assim que um profissional cria
+// a loja — mesmo padrão de "melhor esforço" acima: chamado sem aguardar
+// (fire-and-forget) pelo client no fim do passo 2 do wizard, nunca bloqueia
+// nem falha visivelmente pro profissional.
+export async function notifyAdminsOfNewSignupAction(businessId: string): Promise<void> {
+  const admin = createAdminClient();
+
+  const { data: business } = await admin
+    .from("businesses")
+    .select("nome_loja, slug")
+    .eq("id", businessId)
+    .maybeSingle();
+  if (!business) return;
+
+  await notifyAdmins(admin, {
+    tipo: "novo_profissional",
+    titulo: "Novo profissional cadastrado",
+    corpo: `${business.nome_loja} acabou de criar a agenda (/${business.slug}).`,
+    url: "/app/admin",
   });
 }

@@ -27,6 +27,7 @@ import type {
   AgendaClientPlan,
   AgendaDayItem,
   AgendaPayment,
+  AgendaProduct,
   AgendaService,
 } from "./types";
 
@@ -44,6 +45,7 @@ export function AgendaDayView({
   dayBlocks,
   clients: clientsIniciais,
   payments: paymentsIniciais,
+  products: productsIniciais,
   clientPlans,
 }: {
   businessId: string;
@@ -60,12 +62,17 @@ export function AgendaDayView({
   dayBlocks: TimeBlock[];
   clients: AgendaClient[];
   payments: AgendaPayment[];
+  products: AgendaProduct[];
   clientPlans: AgendaClientPlan[];
 }) {
   const [appointments, setAppointments] = useState(appointmentsIniciais);
   const [blocks, setBlocks] = useState(blocksIniciais);
   const [clients, setClients] = useState(clientsIniciais);
   const [payments, setPayments] = useState(paymentsIniciais);
+  // Produtos vendidos junto do agendamento não são editados aqui na Agenda
+  // (só na vitrine pública) — não precisa de state próprio, o valor inicial
+  // já é o valor definitivo pra essa tela.
+  const products = productsIniciais;
   const [paymentTarget, setPaymentTarget] = useState<AgendaAppointment | null>(null);
   const [paymentFormKey, setPaymentFormKey] = useState(0);
   const [chargeTarget, setChargeTarget] = useState<AgendaAppointment | null>(null);
@@ -96,6 +103,15 @@ export function AgendaDayView({
     () => new Map(payments.map((p) => [p.appointment_id, p])),
     [payments],
   );
+  const productsByAppointment = useMemo(() => {
+    const map = new Map<string, AgendaProduct[]>();
+    for (const product of products) {
+      const lista = map.get(product.appointment_id);
+      if (lista) lista.push(product);
+      else map.set(product.appointment_id, [product]);
+    }
+    return map;
+  }, [products]);
   const clientPlanByClient = useMemo(
     () => new Map(clientPlans.map((p) => [p.clientId, p])),
     [clientPlans],
@@ -169,6 +185,7 @@ export function AgendaDayView({
   const paymentService = paymentTarget ? (servicesById.get(paymentTarget.service_id) ?? null) : null;
   const paymentClient = paymentTarget ? (clientsById.get(paymentTarget.client_id) ?? null) : null;
   const paymentExisting = paymentTarget ? paymentsByAppointment.get(paymentTarget.id) : undefined;
+  const paymentProducts = paymentTarget ? (productsByAppointment.get(paymentTarget.id) ?? []) : [];
 
   function handleAdvanceLinkCreated(appointmentId: string, valor: number) {
     // Reflete "pendente" na hora, sem esperar recarregar a página — o
@@ -362,6 +379,7 @@ export function AgendaDayView({
                   service={servicesById.get(item.appointment.service_id)}
                   client={clientsById.get(item.appointment.client_id)}
                   payment={paymentsByAppointment.get(item.appointment.id)}
+                  products={productsByAppointment.get(item.appointment.id) ?? []}
                   clientPlan={clientPlanByClient.get(item.appointment.client_id)}
                   timezone={timezone}
                   nomeLoja={nomeLoja}
@@ -386,12 +404,14 @@ export function AgendaDayView({
         service={paymentService}
         client={paymentClient}
         existingPayment={paymentExisting}
+        products={paymentProducts}
         onOpenChange={(open) => !open && setPaymentTarget(null)}
         onCompleted={handlePaymentCompleted}
       />
 
       <CancelAppointmentDialog
         appointment={cancelTarget}
+        products={cancelTarget ? (productsByAppointment.get(cancelTarget.id) ?? []) : []}
         onOpenChange={(open) => !open && setCancelTarget(null)}
         onConfirm={handleConfirmCancel}
       />

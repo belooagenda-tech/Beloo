@@ -6,7 +6,7 @@ import { getOwnBusiness } from "@/lib/supabase/session";
 import { resolveDayBlocks } from "@/lib/agenda/day-window";
 import { AgendaDayView } from "./agenda-day-view";
 import { WaitlistCard, type WaitlistEntryRow } from "./waitlist-card";
-import type { AgendaAppointment, AgendaClient, AgendaPayment } from "./types";
+import type { AgendaAppointment, AgendaClient, AgendaPayment, AgendaProduct } from "./types";
 
 export const metadata: Metadata = { title: "Agenda" };
 
@@ -19,6 +19,7 @@ export const metadata: Metadata = { title: "Agenda" };
 type AppointmentEmbedRow = AgendaAppointment & {
   clients: AgendaClient | null;
   appointment_payments: AgendaPayment | null;
+  appointment_products: AgendaProduct[];
 };
 
 type WaitlistEmbedRow = {
@@ -63,7 +64,7 @@ export default async function AgendaPage({
     supabase
       .from("appointments")
       .select(
-        "id, client_id, service_id, inicio, fim, status, observacoes, entrada_status, entrada_valor, clients(id, nome, telefone), appointment_payments(id, appointment_id, valor, forma_pagamento, origem, entrada_valor)",
+        "id, client_id, service_id, inicio, fim, status, observacoes, entrada_status, entrada_valor, clients(id, nome, telefone), appointment_payments(id, appointment_id, valor, forma_pagamento, origem, entrada_valor), appointment_products(id, appointment_id, nome_snapshot, preco_snapshot, quantidade)",
       )
       .eq("business_id", business!.id)
       .gte("inicio", dayStart.toISOString())
@@ -116,15 +117,22 @@ export default async function AgendaPage({
   );
 
   const appointmentRows = ((appointmentsRaw ?? []) as unknown as AppointmentEmbedRow[]).map(
-    ({ clients, appointment_payments, ...appointment }) => ({ appointment, clients, appointment_payments }),
+    ({ clients, appointment_payments, appointment_products, ...appointment }) => ({
+      appointment,
+      clients,
+      appointment_payments,
+      appointment_products,
+    }),
   );
   const appointments: AgendaAppointment[] = appointmentRows.map((r) => r.appointment);
 
   const clientsById = new Map<string, AgendaClient>();
   const payments: AgendaPayment[] = [];
+  const products: AgendaProduct[] = [];
   for (const row of appointmentRows) {
     if (row.clients) clientsById.set(row.clients.id, row.clients);
     if (row.appointment_payments) payments.push(row.appointment_payments);
+    products.push(...(row.appointment_products ?? []));
   }
   const clients = [...clientsById.values()];
   const clientIds = [...clientsById.keys()];
@@ -180,6 +188,7 @@ export default async function AgendaPage({
         dayBlocks={dayBlocks}
         clients={clients}
         payments={payments}
+        products={products}
         clientPlans={clientPlans}
       />
     </div>

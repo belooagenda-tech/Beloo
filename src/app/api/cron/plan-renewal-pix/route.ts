@@ -9,21 +9,7 @@ import { logError } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  // Fail-closed: sem CRON_SECRET configurado, a rota nunca roda (achado 🟠
-  // da auditoria de 2026-08-07).
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    console.error("Beloo: CRON_SECRET não configurado — recusando /api/cron/plan-renewal-pix");
-    return new NextResponse("Not configured", { status: 500 });
-  }
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${secret}`) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
-
-  const admin = createAdminClient();
-  const hoje = new Date();
+export async function runPlanRenewalPix(admin: ReturnType<typeof createAdminClient>, hoje: Date) {
   const janela = formatISO(addDays(hoje, PLANO_PIX_LEMBRETE_DIAS_ANTES), { representation: "date" });
 
   const { data: subs } = await admin
@@ -114,5 +100,24 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, linksGerados, marcadosAtrasado });
+  return { linksGerados, marcadosAtrasado };
+}
+
+export async function GET(request: Request) {
+  // Fail-closed: sem CRON_SECRET configurado, a rota nunca roda (achado 🟠
+  // da auditoria de 2026-08-07).
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.error("Beloo: CRON_SECRET não configurado — recusando /api/cron/plan-renewal-pix");
+    return new NextResponse("Not configured", { status: 500 });
+  }
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${secret}`) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  const admin = createAdminClient();
+  const resultado = await runPlanRenewalPix(admin, new Date());
+
+  return NextResponse.json({ ok: true, ...resultado });
 }

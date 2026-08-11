@@ -27,7 +27,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import type { AgendaAppointment, AgendaClient, AgendaPayment, AgendaService } from "./types";
+import type { AgendaAppointment, AgendaClient, AgendaPayment, AgendaProduct, AgendaService } from "./types";
 
 const FORMAS: { value: FormaPagamento; label: string }[] = [
   { value: "dinheiro", label: "Dinheiro" },
@@ -59,6 +59,7 @@ function PaymentForm({
   service,
   client,
   existingPayment,
+  products,
   onOpenChange,
   onCompleted,
 }: {
@@ -66,10 +67,18 @@ function PaymentForm({
   service: AgendaService;
   client: AgendaClient;
   existingPayment: AgendaPayment | undefined;
+  products: AgendaProduct[];
   onOpenChange: (open: boolean) => void;
   onCompleted: (payment: AgendaPayment) => void;
 }) {
   const jaConcluido = appointment.status === "concluido";
+
+  // Produtos vendidos junto (vitrine pública) nunca são cobertos pela
+  // entrada — entram sempre no valor a cobrar agora, junto do que falta do
+  // serviço. Se o atendimento já foi concluído antes, esse valor já está
+  // embutido em existingPayment.valor (branch abaixo), então só soma aqui
+  // pro cálculo do valor padrão de um atendimento ainda não concluído.
+  const produtosTotal = products.reduce((acc, p) => acc + p.preco_snapshot * p.quantidade, 0);
 
   // Valor da entrada que o cliente já pagou online (Mercado Pago) antes do
   // atendimento. Continua valendo mesmo depois de concluído (entrada_status
@@ -87,7 +96,7 @@ function PaymentForm({
   const valorRestantePadrao =
     jaConcluido && existingPayment
       ? Math.max(round2(existingPayment.valor - entradaJaPaga), 0)
-      : Math.max(round2(service.preco - entradaJaPaga), 0);
+      : Math.max(round2(service.preco + produtosTotal - entradaJaPaga), 0);
 
   const totalmenteCobertoPelaEntrada = entradaJaPaga > 0 && valorRestantePadrao <= 0;
 
@@ -296,6 +305,19 @@ function PaymentForm({
       </Alert>
     ) : null;
 
+  // Produtos escolhidos na vitrine pública para este agendamento — mostrado
+  // só enquanto ainda não foi concluído (depois, o total já vem embutido em
+  // existingPayment.valor, sem lista separada).
+  const produtosInfo =
+    !jaConcluido && products.length > 0 ? (
+      <Alert>
+        <AlertDescription>
+          Também levou: {products.map((p) => `${p.quantidade}× ${p.nome_snapshot}`).join(", ")} —{" "}
+          {formatarPreco(produtosTotal)}, já incluído no valor abaixo.
+        </AlertDescription>
+      </Alert>
+    ) : null;
+
   // Entrada cobriu o valor todo e o profissional ainda não pediu pra ajustar
   // — só confirma a conclusão, sem pedir forma de pagamento pro que já foi
   // pago online.
@@ -308,6 +330,7 @@ function PaymentForm({
           </Alert>
         ) : null}
         {entradaInfo}
+        {produtosInfo}
         <DialogFooter className="flex-col gap-2 sm:flex-col">
           <Button onClick={concluirComEntradaTotal} disabled={submitting} className="w-full">
             {submitting ? "Concluindo..." : "Concluir atendimento"}
@@ -334,6 +357,7 @@ function PaymentForm({
       ) : null}
 
       {entradaInfo}
+      {produtosInfo}
 
       <div className="space-y-1.5">
         <Label htmlFor="valor-pagamento">
@@ -396,6 +420,7 @@ export function PaymentModal({
   service,
   client,
   existingPayment,
+  products,
   onOpenChange,
   onCompleted,
 }: {
@@ -405,6 +430,7 @@ export function PaymentModal({
   service: AgendaService | null;
   client: AgendaClient | null;
   existingPayment: AgendaPayment | undefined;
+  products: AgendaProduct[];
   onOpenChange: (open: boolean) => void;
   onCompleted: (payment: AgendaPayment) => void;
 }) {
@@ -423,6 +449,7 @@ export function PaymentModal({
             service={service}
             client={client}
             existingPayment={existingPayment}
+            products={products}
             onOpenChange={onOpenChange}
             onCompleted={onCompleted}
           />

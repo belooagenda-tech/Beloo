@@ -182,7 +182,8 @@ export type NotificationTipo =
   | "assinatura_expirando"
   | "reagendamento"
   | "avaliacao_recebida"
-  | "lista_espera";
+  | "lista_espera"
+  | "novo_profissional";
 
 export type Notification = {
   id: string;
@@ -244,6 +245,31 @@ export type AppointmentRating = {
   appointment_id: string;
   nota: number;
   comentario: string | null;
+  created_at: string;
+};
+
+export type Product = {
+  id: string;
+  business_id: string;
+  nome: string;
+  descricao: string | null;
+  preco: number;
+  imagem_url: string | null;
+  ativo: boolean;
+  ordem: number;
+  created_at: string;
+};
+
+// Produtos adicionados a um agendamento — N por agendamento (diferente de
+// AppointmentPayment, que é 1:1). nome_snapshot/preco_snapshot preservam o
+// que foi vendido mesmo se o produto for editado/apagado depois.
+export type AppointmentProduct = {
+  id: string;
+  appointment_id: string;
+  product_id: string | null;
+  nome_snapshot: string;
+  preco_snapshot: number;
+  quantidade: number;
   created_at: string;
 };
 
@@ -377,6 +403,8 @@ export type Database = {
       recurring_blocks: Table<RecurringBlock>;
       appointment_ratings: Table<AppointmentRating>;
       waitlist_entries: Table<WaitlistEntry>;
+      products: Table<Product>;
+      appointment_products: Table<AppointmentProduct>;
       mp_connections: Table<MpConnection>;
       push_subscriptions: Table<PushSubscriptionRow>;
       saas_plans: Table<SaasPlan>;
@@ -429,6 +457,7 @@ export type Database = {
           p_entrada_valor: number | null;
           p_entrada_expira_em: string | null;
           p_max_agendamentos_futuros: number;
+          p_produtos?: { product_id: string; quantidade: number }[];
         };
         Returns: {
           appointment_id: string;

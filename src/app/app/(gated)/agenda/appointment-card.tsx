@@ -14,7 +14,14 @@ import {
 import { cn } from "@/lib/utils";
 import { evaluatePlanCoverage } from "@/lib/booking/plan-coverage";
 import { buildAppointmentReminderMessage, buildWhatsAppLink } from "@/lib/whatsapp";
-import type { AgendaAppointment, AgendaClient, AgendaClientPlan, AgendaPayment, AgendaService } from "./types";
+import type {
+  AgendaAppointment,
+  AgendaClient,
+  AgendaClientPlan,
+  AgendaPayment,
+  AgendaProduct,
+  AgendaService,
+} from "./types";
 
 export const STATUS_META: Record<
   AgendaAppointment["status"],
@@ -37,6 +44,7 @@ export function AppointmentCard({
   service,
   client,
   payment,
+  products,
   clientPlan,
   timezone,
   nomeLoja,
@@ -52,6 +60,7 @@ export function AppointmentCard({
   service: AgendaService | undefined;
   client: AgendaClient | undefined;
   payment: AgendaPayment | undefined;
+  products: AgendaProduct[];
   clientPlan: AgendaClientPlan | undefined;
   timezone: string;
   nomeLoja: string;
@@ -168,6 +177,11 @@ export function AppointmentCard({
                 </>
               ) : null}
             </p>
+            {products.length > 0 ? (
+              <p className="truncate text-xs text-muted-foreground">
+                + {products.map((p) => `${p.quantidade}× ${p.nome_snapshot}`).join(", ")}
+              </p>
+            ) : null}
             {entradaJaPaga > 0 ? (
               <p className="mt-0.5 text-xs font-medium text-success">
                 {pagoIntegralmente

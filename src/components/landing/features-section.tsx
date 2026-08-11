@@ -1,23 +1,42 @@
-import { BarChart3, Bell, CalendarDays, MessageCircle, Repeat, Smartphone, Star, Wallet } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  CalendarClock,
+  CalendarDays,
+  Gift,
+  MessageCircle,
+  QrCode,
+  Repeat,
+  ShoppingBag,
+  Smartphone,
+  Star,
+  Wallet,
+} from "lucide-react";
 
 const FUNCIONALIDADES = [
   {
     icon: CalendarDays,
     titulo: "Agenda inteligente",
     descricao:
-      "Os horários livres são calculados na hora, considerando a duração de cada serviço. Veja o dia em lista ou em grade, e confirme, conclua ou cancele com um toque — sem menus escondidos.",
+      "Os horários livres são calculados na hora, considerando a duração de cada serviço. Veja o dia em lista ou em grade, bloqueie horários recorrentes (folga fixa, almoço) e confirme, conclua ou cancele com um toque.",
+  },
+  {
+    icon: ShoppingBag,
+    titulo: "Vitrine de produtos",
+    descricao:
+      "Cadastre o que você vende além dos serviços e deixe o cliente adicionar ao agendamento — shampoo, óleo, kit de finalização. O valor entra junto na conta, sem misturar com sua agenda de horários.",
   },
   {
     icon: MessageCircle,
-    titulo: "Lembretes no WhatsApp",
+    titulo: "WhatsApp com mensagem pronta",
     descricao:
-      "Lembre o cliente do horário e chame quem sumiu de volta, direto pelo WhatsApp, com a mensagem já pronta.",
+      "Lembre o cliente do horário, chame quem sumiu de volta ou avise sobre um horário livre na lista de espera — tudo com um link que já abre o WhatsApp com o texto certo.",
   },
   {
     icon: Wallet,
-    titulo: "Controle de pagamentos",
+    titulo: "Pagamento online (Mercado Pago)",
     descricao:
-      "Dê baixa em cada atendimento, registre a forma de pagamento e acompanhe seu faturamento sem precisar de planilha.",
+      "Cobre uma entrada ou o valor cheio antes do atendimento, com link gerado na hora — direto na sua conta, sem precisar ficar cobrando de novo pessoalmente.",
   },
   {
     icon: Repeat,
@@ -29,19 +48,37 @@ const FUNCIONALIDADES = [
     icon: Star,
     titulo: "Reagendamento e avaliações",
     descricao:
-      "Seu cliente remarca, cancela e avalia o atendimento sozinho, pelo mesmo link — e você é avisado na hora de cada avaliação recebida.",
+      "Seu cliente remarca, cancela e avalia o atendimento sozinho, pelo mesmo link — você é avisado na hora e ainda pode convidar quem avaliou bem a te seguir no Instagram ou avaliar no Google.",
   },
   {
     icon: BarChart3,
     titulo: "Relatórios financeiros",
     descricao:
-      "Gráficos de faturamento por período, serviço e forma de pagamento, com exportação em CSV pra sua contabilidade.",
+      "Faturamento por período, serviço, produto e forma de pagamento, com exportação em CSV e relatório pronto pra imprimir.",
+  },
+  {
+    icon: Gift,
+    titulo: "Clientes aniversariantes",
+    descricao:
+      "Veja quem faz aniversário no mês e mande uma mensagem especial pelo WhatsApp — um jeito simples de fidelizar sem precisar lembrar de nada.",
+  },
+  {
+    icon: CalendarClock,
+    titulo: "Lista de espera",
+    descricao:
+      "Sua agenda lotou? O cliente entra na lista de espera sozinho, e você chama pelo WhatsApp assim que um horário abrir.",
+  },
+  {
+    icon: QrCode,
+    titulo: "QR Code pra divulgar na loja",
+    descricao:
+      "Gere um QR Code personalizado do seu link de agendamento e imprima pra deixar no balcão — o cliente só aponta a câmera e já cai direto na sua agenda.",
   },
   {
     icon: Bell,
     titulo: "Notificações em tempo real",
     descricao:
-      "Você recebe um aviso assim que um agendamento chega, é cancelado ou remarcado — e seus clientes recebem lembretes antes do horário.",
+      "Você recebe um aviso assim que um agendamento chega, é cancelado, remarcado ou avaliado — e seus clientes recebem lembretes antes do horário.",
   },
   {
     icon: Smartphone,

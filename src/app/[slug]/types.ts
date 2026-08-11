@@ -16,6 +16,14 @@ export type PublicService = {
   preco: number;
 };
 
+export type PublicProduct = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  preco: number;
+  imagem_url: string | null;
+};
+
 export type PublicPlan = {
   id: string;
   nome: string;
