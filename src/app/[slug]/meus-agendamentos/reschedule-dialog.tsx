@@ -81,6 +81,8 @@ export function RescheduleDialog({
             onSelect={handleSelect}
             onBack={() => onOpenChange(false)}
             backLabel="Cancelar"
+            slug={slug}
+            serviceId={appointment.serviceId}
           />
         ) : null}
       </DialogContent>

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 import { BusinessInfoCard } from "./business-info-card";
 import { SocialLinksCard } from "./social-links-card";
+import { WhatsAppTemplateCard } from "./whatsapp-template-card";
 import { PushNotificationsCard } from "./push-notifications-card";
 import { ChangePasswordCard } from "./change-password-card";
 import { MercadoPagoCard } from "./mercadopago-card";
@@ -64,6 +65,11 @@ export default async function ConfiguracoesPage() {
         businessId={business!.id}
         instagramUrl={business!.instagram_url}
         googleReviewUrl={business!.google_review_url}
+      />
+
+      <WhatsAppTemplateCard
+        businessId={business!.id}
+        template={business!.whatsapp_lembrete_template}
       />
 
       <PushNotificationsCard profileId={user!.id} />

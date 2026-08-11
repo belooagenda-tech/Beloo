@@ -3,7 +3,7 @@ import { addDays, addMonths, formatISO } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSignature } from "@/lib/mercadopago/webhook-signature";
-import { getPayment, getPreapproval, platformAccessToken } from "@/lib/mercadopago/client";
+import { getPayment, getPreapproval, platformAccessToken, refundPayment } from "@/lib/mercadopago/client";
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { notifyProfessional } from "@/lib/push/notify";
 import { logError } from "@/lib/logger";
@@ -95,6 +95,118 @@ async function handleAppointmentDeposit(admin: Admin, appointmentId: string, dat
     await admin
       .from("appointments")
       .update({ status: "cancelado", entrada_status: "expirado", mp_payment_id: payment.id })
+      .eq("id", appointment.id);
+  }
+  // outros status (pending, in_process) — não faz nada, espera a próxima notificação.
+
+  return NextResponse.json({ ok: true });
+}
+
+// Pagamento antecipado cobrado depois que o agendamento já existia — gerado
+// pela Agenda (agenda/actions.ts → createAdvancePaymentLinkAction), NÃO pelo
+// fluxo de agendamento público. Propositalmente um handler à parte de
+// handleAppointmentDeposit: aqui o agendamento já estava confirmado antes da
+// cobrança, então o resultado do pagamento nunca deve mexer em
+// appointments.status — nem voltar pra "agendado" na aprovação (perderia um
+// "confirmado" já existente), nem cancelar na recusa (o cliente já tinha um
+// horário garantido, só a cobrança falhou).
+async function handleAppointmentAdvancePayment(admin: Admin, appointmentId: string, dataId: string) {
+  const { data: appointment } = await admin
+    .from("appointments")
+    .select("id, business_id, client_id, service_id, status, entrada_status, entrada_valor")
+    .eq("id", appointmentId)
+    .maybeSingle();
+  if (!appointment) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // Idempotência: só processa enquanto a cobrança está "pendente" — evita
+  // reprocessar em reentregas do webhook.
+  if (appointment.entrada_status !== "pendente") {
+    return NextResponse.json({ ok: true });
+  }
+
+  const accessToken = await getValidAccessToken(admin, appointment.business_id);
+  if (!accessToken) {
+    return new NextResponse("No Mercado Pago connection", { status: 409 });
+  }
+
+  const payment = await getPayment(accessToken, dataId).catch((err) => {
+    logError("mp_webhook.saldo.consultar_pagamento", err, { appointmentId, dataId });
+    return null;
+  });
+  if (!payment || payment.externalReference !== appointment.id) {
+    return new NextResponse("Payment mismatch", { status: 400 });
+  }
+
+  if (payment.status === "approved") {
+    // Se o agendamento foi cancelado enquanto essa cobrança ainda estava em
+    // aberto, o dinheiro não pode ficar retido — devolve na hora em vez de
+    // marcar como pago.
+    if (appointment.status !== "agendado" && appointment.status !== "confirmado") {
+      await refundPayment(accessToken, payment.id).catch((err) => {
+        logError("mp_webhook.saldo.reembolso_automatico", err, { appointmentId, paymentId: payment.id });
+      });
+      await admin
+        .from("appointments")
+        .update({ entrada_status: "reembolsado", mp_payment_id: payment.id })
+        .eq("id", appointment.id);
+      return NextResponse.json({ ok: true });
+    }
+
+    const valorPago = appointment.entrada_valor ?? payment.transactionAmount;
+    await admin
+      .from("appointments")
+      .update({ entrada_status: "pago", entrada_valor: valorPago, mp_payment_id: payment.id })
+      .eq("id", appointment.id);
+
+    // Mesmo padrão da entrada no ato do agendamento: registra a receita já em
+    // appointment_payments assim que o dinheiro entra, sem esperar o
+    // profissional "concluir e receber" depois. complete_appointment_payment
+    // usa upsert por appointment_id, então não colide com esse registro.
+    await admin.from("appointment_payments").upsert(
+      {
+        appointment_id: appointment.id,
+        valor: valorPago,
+        forma_pagamento: "entrada_mp",
+        origem: "avulso",
+        entrada_valor: valorPago,
+        pago_em: new Date().toISOString(),
+      },
+      { onConflict: "appointment_id", ignoreDuplicates: true },
+    );
+
+    const { data: business } = await admin
+      .from("businesses")
+      .select("profile_id")
+      .eq("id", appointment.business_id)
+      .maybeSingle();
+    if (business) {
+      const [{ data: client }, { data: service }] = await Promise.all([
+        admin.from("clients").select("nome").eq("id", appointment.client_id).maybeSingle(),
+        admin.from("services").select("nome, preco").eq("id", appointment.service_id).maybeSingle(),
+      ]);
+      const quitado = service ? valorPago >= service.preco : false;
+      try {
+        await notifyProfessional(admin, {
+          profileId: business.profile_id,
+          tipo: "entrada_paga",
+          titulo: quitado ? "Pagamento recebido" : "Pagamento antecipado recebido",
+          corpo: `${client?.nome ?? "Cliente"} pagou ${quitado ? "o valor total" : "um valor antecipado"} de ${service?.nome ?? "um atendimento"} pelo link enviado.`,
+          appointmentId: appointment.id,
+          url: "/app/agenda",
+        });
+      } catch {
+        // não bloqueia a confirmação do pagamento
+      }
+    }
+  } else if (payment.status === "rejected" || payment.status === "cancelled") {
+    // Diferente da entrada no ato do agendamento: aqui o agendamento já
+    // existia antes da cobrança, então uma recusa só libera pra tentar cobrar
+    // de novo — nunca cancela o horário do cliente.
+    await admin
+      .from("appointments")
+      .update({ entrada_status: "nao_aplicavel", mp_payment_id: payment.id })
       .eq("id", appointment.id);
   }
   // outros status (pending, in_process) — não faz nada, espera a próxima notificação.
@@ -338,6 +450,11 @@ export async function POST(request: Request) {
   const appointmentId = searchParams.get("appointment");
   if (appointmentId) {
     return handleAppointmentDeposit(admin, appointmentId, dataId);
+  }
+
+  const saldoAppointmentId = searchParams.get("saldo");
+  if (saldoAppointmentId) {
+    return handleAppointmentAdvancePayment(admin, saldoAppointmentId, dataId);
   }
 
   const planSubId = searchParams.get("planSub");

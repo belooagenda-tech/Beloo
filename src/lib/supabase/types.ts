@@ -49,6 +49,8 @@ export type Business = {
   entrada_percentual: number;
   instagram_url: string | null;
   google_review_url: string | null;
+  whatsapp_lembrete_template: string | null;
+  meta_faturamento_mensal: number | null;
   created_at: string;
 };
 
@@ -99,6 +101,7 @@ export type Client = {
   nome: string;
   telefone: string;
   observacoes: string | null;
+  data_nascimento: string | null;
   criado_em: string;
 };
 
@@ -178,7 +181,8 @@ export type NotificationTipo =
   | "plano_pago"
   | "assinatura_expirando"
   | "reagendamento"
-  | "avaliacao_recebida";
+  | "avaliacao_recebida"
+  | "lista_espera";
 
 export type Notification = {
   id: string;
@@ -211,6 +215,27 @@ export type AgendaBlock = {
   inicio: string;
   fim: string;
   motivo: string | null;
+  created_at: string;
+};
+
+export type RecurringBlock = {
+  id: string;
+  business_id: string;
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fim: string;
+  motivo: string | null;
+  created_at: string;
+};
+
+export type WaitlistEntry = {
+  id: string;
+  business_id: string;
+  nome: string;
+  telefone: string;
+  service_id: string | null;
+  observacao: string | null;
+  atendido: boolean;
   created_at: string;
 };
 
@@ -349,7 +374,9 @@ export type Database = {
       appointments: Table<Appointment>;
       appointment_payments: Table<AppointmentPayment>;
       agenda_blocks: Table<AgendaBlock>;
+      recurring_blocks: Table<RecurringBlock>;
       appointment_ratings: Table<AppointmentRating>;
+      waitlist_entries: Table<WaitlistEntry>;
       mp_connections: Table<MpConnection>;
       push_subscriptions: Table<PushSubscriptionRow>;
       saas_plans: Table<SaasPlan>;

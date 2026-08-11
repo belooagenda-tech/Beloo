@@ -4,6 +4,7 @@ import { getOwnBusiness } from "@/lib/supabase/session";
 import { WeeklyHoursCard } from "./weekly-hours-card";
 import { GeneralSettingsCard } from "./general-settings-card";
 import { ExceptionsCard } from "./exceptions-card";
+import { RecurringBlocksCard } from "./recurring-blocks-card";
 
 export const metadata: Metadata = { title: "Disponibilidade" };
 
@@ -11,7 +12,7 @@ export default async function DisponibilidadePage() {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
-  const [{ data: hours }, { data: exceptions }] = await Promise.all([
+  const [{ data: hours }, { data: exceptions }, { data: recurringBlocks }] = await Promise.all([
     supabase
       .from("business_hours")
       .select("dia_semana, hora_inicio, hora_fim")
@@ -21,6 +22,11 @@ export default async function DisponibilidadePage() {
       .select("id, data, tipo, hora_inicio, hora_fim")
       .eq("business_id", business!.id)
       .order("data", { ascending: true }),
+    supabase
+      .from("recurring_blocks")
+      .select("id, dia_semana, hora_inicio, hora_fim, motivo")
+      .eq("business_id", business!.id)
+      .order("dia_semana", { ascending: true }),
   ]);
 
   return (
@@ -43,6 +49,8 @@ export default async function DisponibilidadePage() {
         initialBufferPadrao={business!.buffer_padrao_min}
         initialCancelamentoMinHoras={business!.cancelamento_min_horas}
       />
+
+      <RecurringBlocksCard businessId={business!.id} initialBlocks={recurringBlocks ?? []} />
 
       <ExceptionsCard businessId={business!.id} initialExceptions={exceptions ?? []} />
     </div>

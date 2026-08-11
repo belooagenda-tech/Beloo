@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { normalizePhone, formatPhoneBR } from "@/lib/phone";
 import { NewClientDialog } from "./new-client-dialog";
 import { InactiveClientsView } from "./inactive-clients-view";
+import { BirthdayClientsView } from "./birthday-clients-view";
 import { CLIENTES_PAGE_SIZE } from "./constants";
 import type { ClientListItem } from "./types";
 
@@ -28,7 +29,7 @@ export function ClientsListView({
   const [clients, setClients] = useState(initialClients);
   const [busca, setBusca] = useState("");
   const [carregandoMais, setCarregandoMais] = useState(false);
-  const [aba, setAba] = useState<"todos" | "inativos">("todos");
+  const [aba, setAba] = useState<"todos" | "inativos" | "aniversariantes">("todos");
 
   const haMaisParaCarregar = clients.length < totalCount;
 
@@ -91,10 +92,20 @@ export function ClientsListView({
         >
           Inativos
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={aba === "aniversariantes" ? "secondary" : "ghost"}
+          onClick={() => setAba("aniversariantes")}
+        >
+          Aniversariantes
+        </Button>
       </div>
 
       {aba === "inativos" ? (
         <InactiveClientsView businessId={businessId} nomeLoja={nomeLoja} />
+      ) : aba === "aniversariantes" ? (
+        <BirthdayClientsView businessId={businessId} />
       ) : (
         <>
           <div className="relative">

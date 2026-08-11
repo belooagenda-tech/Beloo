@@ -312,6 +312,67 @@ export async function createAppointmentAction(input: {
   return { ok: true, appointmentId };
 }
 
+export type JoinWaitlistResult = { ok: true } | { ok: false; error: string };
+
+// Sem correspondência automática de propósito — o profissional vê a fila na
+// Agenda e chama manualmente pelo WhatsApp quando abrir um horário. Evita a
+// complexidade (e os jeitos sutis de dar errado) de casar vaga x pedido
+// sozinho, o tipo de coisa que é fácil de acertar 90% e furar o resto.
+export async function joinWaitlistAction(input: {
+  slug: string;
+  nome: string;
+  telefone: string;
+  serviceId?: string;
+  observacao?: string;
+}): Promise<JoinWaitlistResult> {
+  const dentroDoLimite = await checkRateLimit("public_join_waitlist", {
+    windowSeconds: 15 * 60,
+    maxAttempts: 10,
+  });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
+  const parsed = clientInfoSchema.safeParse({ nome: input.nome, telefone: input.telefone });
+  if (!parsed.success) {
+    return { ok: false, error: "Confira seu nome e WhatsApp e tente novamente." };
+  }
+
+  const supabase = createAdminClient();
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id, profile_id")
+    .eq("slug", input.slug)
+    .maybeSingle();
+  if (!business) return { ok: false, error: "Loja não encontrada." };
+
+  const { error } = await supabase.from("waitlist_entries").insert({
+    business_id: business.id,
+    nome: parsed.data.nome,
+    telefone: normalizePhone(parsed.data.telefone),
+    service_id: input.serviceId || null,
+    observacao: input.observacao?.trim() || null,
+  });
+  if (error) {
+    return { ok: false, error: "Não foi possível entrar na lista de espera. Tente novamente." };
+  }
+
+  try {
+    await notifyProfessional(supabase, {
+      profileId: business.profile_id,
+      tipo: "lista_espera",
+      titulo: "Nova entrada na lista de espera",
+      corpo: `${parsed.data.nome} quer ser avisado quando abrir um horário.`,
+      url: "/app/agenda",
+    });
+  } catch {
+    // A entrada na fila já foi salva; falha ao notificar não pode derrubar
+    // a resposta pro cliente.
+  }
+
+  return { ok: true };
+}
+
 export type PublicAppointmentSummary = {
   id: string;
   serviceId: string;

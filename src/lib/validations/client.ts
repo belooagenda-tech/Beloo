@@ -8,6 +8,7 @@ export const clientSchema = z.object({
     .trim()
     .refine(isValidBrazilianPhone, "Informe um telefone válido."),
   observacoes: z.string().trim().max(2000, "Máximo de 2000 caracteres.").optional(),
+  dataNascimento: z.string().trim().optional(),
 });
 
 export type ClientFormInput = z.infer<typeof clientSchema>;

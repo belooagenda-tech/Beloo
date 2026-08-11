@@ -21,6 +21,7 @@ const DESTINO_POR_TIPO: Record<Notification["tipo"], string> = {
   lembrete_dia: "/app/agenda",
   plano_pago: "/app/clientes",
   avaliacao_recebida: "/app/clientes",
+  lista_espera: "/app/agenda",
   assinatura_expirando: "/app/assinatura",
 };
 

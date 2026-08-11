@@ -20,7 +20,7 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 sm:px-6">
+      <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 sm:px-6 print:hidden">
         <Link href="/app" className="flex items-center gap-2">
           <LogoMark className="size-7" />
           <span className="font-heading text-sm font-semibold text-foreground sm:text-base">
@@ -33,10 +33,14 @@ export function AppShell({
         </div>
       </header>
       <div className="flex flex-1 flex-col md:flex-row">
-        <AppSidebarNav isAdmin={isAdmin} />
-        <main className="flex-1 px-4 py-6 pb-20 sm:px-6 md:pb-6">{children}</main>
+        <div className="print:hidden">
+          <AppSidebarNav isAdmin={isAdmin} />
+        </div>
+        <main className="flex-1 px-4 py-6 pb-20 sm:px-6 md:pb-6 print:p-0">{children}</main>
       </div>
-      <MobileBottomNav isAdmin={isAdmin} />
+      <div className="print:hidden">
+        <MobileBottomNav isAdmin={isAdmin} />
+      </div>
     </div>
   );
 }

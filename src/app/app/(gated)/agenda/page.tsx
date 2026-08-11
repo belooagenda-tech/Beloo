@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOwnBusiness } from "@/lib/supabase/session";
 import { resolveDayBlocks } from "@/lib/agenda/day-window";
 import { AgendaDayView } from "./agenda-day-view";
+import { WaitlistCard, type WaitlistEntryRow } from "./waitlist-card";
 import type { AgendaAppointment, AgendaClient, AgendaPayment } from "./types";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -18,6 +19,14 @@ export const metadata: Metadata = { title: "Agenda" };
 type AppointmentEmbedRow = AgendaAppointment & {
   clients: AgendaClient | null;
   appointment_payments: AgendaPayment | null;
+};
+
+type WaitlistEmbedRow = {
+  id: string;
+  nome: string;
+  telefone: string;
+  observacao: string | null;
+  services: { nome: string } | null;
 };
 
 export default async function AgendaPage({
@@ -41,6 +50,7 @@ export default async function AgendaPage({
     { data: blocks },
     { data: businessHours },
     { data: dayExceptions },
+    { data: waitlistRaw },
   ] = await Promise.all([
     supabase
       .from("services")
@@ -74,7 +84,25 @@ export default async function AgendaPage({
       .select("data, tipo, hora_inicio, hora_fim")
       .eq("business_id", business!.id)
       .eq("data", dataSelecionada),
+    // Fila de espera — pequena (poucas linhas por loja), mostrada no topo da
+    // Agenda pra sempre ficar visível, independente do dia selecionado.
+    supabase
+      .from("waitlist_entries")
+      .select("id, nome, telefone, observacao, services(nome)")
+      .eq("business_id", business!.id)
+      .eq("atendido", false)
+      .order("created_at", { ascending: true }),
   ]);
+
+  const waitlistEntries: WaitlistEntryRow[] = ((waitlistRaw ?? []) as unknown as WaitlistEmbedRow[]).map(
+    (row) => ({
+      id: row.id,
+      nome: row.nome,
+      telefone: row.telefone,
+      observacao: row.observacao,
+      servicoNome: row.services?.nome ?? null,
+    }),
+  );
 
   // Blocos de expediente do dia selecionado — mesma regra de precedência do
   // motor de disponibilidade pública (exceção > horário comercial da semana),
@@ -134,21 +162,26 @@ export default async function AgendaPage({
   });
 
   return (
-    <AgendaDayView
-      key={dataSelecionada}
-      businessId={business!.id}
-      timezone={business!.timezone}
-      nomeLoja={business!.nome_loja}
-      bufferPadrao={business!.buffer_padrao_min}
-      dataSelecionada={dataSelecionada}
-      hojeStr={hojeStr}
-      services={services ?? []}
-      appointments={appointments}
-      blocks={blocks ?? []}
-      dayBlocks={dayBlocks}
-      clients={clients}
-      payments={payments}
-      clientPlans={clientPlans}
-    />
+    <div className="mx-auto max-w-2xl space-y-6">
+      <WaitlistCard nomeLoja={business!.nome_loja} initialEntries={waitlistEntries} />
+      <AgendaDayView
+        key={dataSelecionada}
+        businessId={business!.id}
+        timezone={business!.timezone}
+        nomeLoja={business!.nome_loja}
+        slug={business!.slug}
+        whatsappTemplate={business!.whatsapp_lembrete_template}
+        bufferPadrao={business!.buffer_padrao_min}
+        dataSelecionada={dataSelecionada}
+        hojeStr={hojeStr}
+        services={services ?? []}
+        appointments={appointments}
+        blocks={blocks ?? []}
+        dayBlocks={dayBlocks}
+        clients={clients}
+        payments={payments}
+        clientPlans={clientPlans}
+      />
+    </div>
   );
 }

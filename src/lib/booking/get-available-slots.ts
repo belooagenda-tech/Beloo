@@ -27,33 +27,45 @@ export async function getAvailableSlotsForService(businessId: string, serviceId:
   const now = new Date();
   const horizonEnd = new Date(now.getTime() + (business.limite_dias_futuro + 1) * 24 * 60 * 60_000);
 
-  const [{ data: hours }, { data: exceptions }, { data: appointments }, { data: services }, { data: blocks }] =
-    await Promise.all([
-      supabase
-        .from("business_hours")
-        .select("dia_semana, hora_inicio, hora_fim")
-        .eq("business_id", businessId),
-      supabase
-        .from("business_exceptions")
-        .select("data, tipo, hora_inicio, hora_fim")
-        .eq("business_id", businessId),
-      supabase
-        .from("appointments")
-        .select("inicio, fim, service_id")
-        .eq("business_id", businessId)
-        .neq("status", "cancelado")
-        .lt("inicio", horizonEnd.toISOString())
-        .gt("fim", now.toISOString()),
-      supabase.from("services").select("id, buffer_min").eq("business_id", businessId),
-      // Bloqueios pontuais criados na Agenda (ex.: almoço) — contam como
-      // ocupado igual um agendamento, sem buffer (não é um atendimento real).
-      supabase
-        .from("agenda_blocks")
-        .select("inicio, fim")
-        .eq("business_id", businessId)
-        .lt("inicio", horizonEnd.toISOString())
-        .gt("fim", now.toISOString()),
-    ]);
+  const [
+    { data: hours },
+    { data: exceptions },
+    { data: appointments },
+    { data: services },
+    { data: blocks },
+    { data: recurringBlocks },
+  ] = await Promise.all([
+    supabase
+      .from("business_hours")
+      .select("dia_semana, hora_inicio, hora_fim")
+      .eq("business_id", businessId),
+    supabase
+      .from("business_exceptions")
+      .select("data, tipo, hora_inicio, hora_fim")
+      .eq("business_id", businessId),
+    supabase
+      .from("appointments")
+      .select("inicio, fim, service_id")
+      .eq("business_id", businessId)
+      .neq("status", "cancelado")
+      .lt("inicio", horizonEnd.toISOString())
+      .gt("fim", now.toISOString()),
+    supabase.from("services").select("id, buffer_min").eq("business_id", businessId),
+    // Bloqueios pontuais criados na Agenda (ex.: almoço) — contam como
+    // ocupado igual um agendamento, sem buffer (não é um atendimento real).
+    supabase
+      .from("agenda_blocks")
+      .select("inicio, fim")
+      .eq("business_id", businessId)
+      .lt("inicio", horizonEnd.toISOString())
+      .gt("fim", now.toISOString()),
+    // Bloqueios recorrentes (ex.: toda segunda de manhã) — pequena tabela
+    // por loja, computeAvailableSlots que instancia em cada dia do horizonte.
+    supabase
+      .from("recurring_blocks")
+      .select("dia_semana, hora_inicio, hora_fim")
+      .eq("business_id", businessId),
+  ]);
 
   const bufferByService = new Map((services ?? []).map((s) => [s.id, s.buffer_min]));
   const busyAppointments: BusyAppointment[] = [
@@ -75,5 +87,6 @@ export async function getAvailableSlotsForService(businessId: string, serviceId:
     businessHours: hours ?? [],
     exceptions: exceptions ?? [],
     busyAppointments,
+    recurringBlocks: recurringBlocks ?? [],
   });
 }

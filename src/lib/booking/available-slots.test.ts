@@ -120,6 +120,32 @@ describe("computeAvailableSlots", () => {
     expect(result[hoje]).toContain(`${hoje}T13:00:00-03:00`);
   });
 
+  it("respeita um bloqueio recorrente no dia da semana correspondente", () => {
+    const hoje = dateStrOf(NOW, 0); // segunda-feira
+    const weekdayHoje = weekdayOf(NOW, 0);
+    const result = computeAvailableSlots({
+      timezone: TIMEZONE,
+      now: NOW,
+      antecedenciaMinutos: 0,
+      limiteDiasFuturo: 7,
+      duracaoMin: 60,
+      bufferMin: 0,
+      businessHours: HORARIO_COMERCIAL,
+      exceptions: [],
+      busyAppointments: [],
+      recurringBlocks: [{ dia_semana: weekdayHoje, hora_inicio: "12:00", hora_fim: "13:00" }],
+    });
+
+    // Segunda (hoje) tem o bloqueio: 12:00 ocupado, 11:00 e 13:00 livres.
+    expect(result[hoje]).not.toContain(`${hoje}T12:00:00-03:00`);
+    expect(result[hoje]).toContain(`${hoje}T11:00:00-03:00`);
+    expect(result[hoje]).toContain(`${hoje}T13:00:00-03:00`);
+
+    // Terça (outro dia da semana) não tem o bloqueio — 12:00 continua livre.
+    const amanha = dateStrOf(NOW, 1);
+    expect(result[amanha]).toContain(`${amanha}T12:00:00-03:00`);
+  });
+
   it("não gera nenhum slot num dia marcado como folga", () => {
     const hoje = dateStrOf(NOW, 0);
     const result = computeAvailableSlots({

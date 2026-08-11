@@ -1,7 +1,7 @@
 "use client";
 
 import { formatInTimeZone } from "date-fns-tz";
-import { MessageCircle, MoreVertical } from "lucide-react";
+import { CircleDollarSign, Clock3, MessageCircle, MoreVertical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,10 +40,13 @@ export function AppointmentCard({
   clientPlan,
   timezone,
   nomeLoja,
+  slug,
+  whatsappTemplate,
   onConfirm,
   onCancel,
   onNoShow,
   onComplete,
+  onChargeAdvance,
 }: {
   appointment: AgendaAppointment;
   service: AgendaService | undefined;
@@ -52,16 +55,21 @@ export function AppointmentCard({
   clientPlan: AgendaClientPlan | undefined;
   timezone: string;
   nomeLoja: string;
+  slug: string;
+  whatsappTemplate: string | null;
   onConfirm: () => void;
   onCancel: () => void;
   onNoShow: () => void;
   onComplete: () => void;
+  onChargeAdvance: () => void;
 }) {
   const status = STATUS_META[appointment.status];
   const podeAgir = appointment.status === "agendado" || appointment.status === "confirmado";
 
   // Link pronto do WhatsApp pra lembrar o cliente do horário — só faz
   // sentido antes do atendimento acontecer (não pra concluído/cancelado).
+  // Inclui o link de "Meus agendamentos" pra remarcar/cancelar sem precisar
+  // pedir pro profissional fazer isso por fora.
   const whatsappLink =
     podeAgir && client
       ? buildWhatsAppLink(
@@ -71,6 +79,8 @@ export function AppointmentCard({
             servicoNome: service?.nome ?? "seu atendimento",
             nomeLoja,
             dataHoraFormatada: formatInTimeZone(new Date(appointment.inicio), timezone, "dd/MM 'às' HH:mm"),
+            linkGerenciar: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/${slug}/meus-agendamentos`,
+            template: whatsappTemplate,
           }),
         )
       : null;
@@ -97,6 +107,12 @@ export function AppointmentCard({
       : 0;
   const entradaEstornada =
     appointment.status === "cancelado" && appointment.entrada_status === "reembolsado";
+
+  // O valor pago antecipadamente pode ter vindo tanto da entrada cobrada no
+  // ato do agendamento público quanto de um link gerado depois na Agenda
+  // (ver createAdvancePaymentLinkAction) — mesmas colunas, mesmo aviso aqui.
+  const pagoIntegralmente = entradaJaPaga > 0 && service !== undefined && entradaJaPaga >= service.preco;
+  const cobrancaPendente = podeAgir && appointment.entrada_status === "pendente";
 
   return (
     <Card>
@@ -154,8 +170,15 @@ export function AppointmentCard({
             </p>
             {entradaJaPaga > 0 ? (
               <p className="mt-0.5 text-xs font-medium text-success">
-                Entrada paga: {formatarPreco(entradaJaPaga)}
-                {service ? ` de ${formatarPreco(service.preco)}` : ""} — falta cobrar o restante
+                {pagoIntegralmente
+                  ? `Pago integralmente: ${formatarPreco(entradaJaPaga)}`
+                  : `Entrada paga: ${formatarPreco(entradaJaPaga)}${service ? ` de ${formatarPreco(service.preco)}` : ""} — falta cobrar o restante`}
+              </p>
+            ) : null}
+            {cobrancaPendente ? (
+              <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-warning">
+                <Clock3 className="size-3" />
+                Aguardando pagamento do link enviado
               </p>
             ) : null}
             {entradaEstornada ? (
@@ -193,6 +216,12 @@ export function AppointmentCard({
               >
                 <MessageCircle className="size-4" />
                 Lembrar no WhatsApp
+              </Button>
+            ) : null}
+            {podeAgir && appointment.entrada_status !== "pago" ? (
+              <Button type="button" size="sm" variant="outline" onClick={onChargeAdvance}>
+                <CircleDollarSign className="size-4" />
+                {cobrancaPendente ? "Reenviar cobrança" : "Cobrar online"}
               </Button>
             ) : null}
             {podeAgir ? (

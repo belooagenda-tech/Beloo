@@ -5,6 +5,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, capitalizeFirst } from "@/lib/utils";
+import { JoinWaitlistForm } from "./join-waitlist-form";
 
 function formatarRotuloDia(dateStr: string) {
   const [ano, mes, dia] = dateStr.split("-").map(Number);
@@ -24,6 +25,8 @@ export function DayTimePicker({
   onSelect,
   onBack,
   backLabel = "Trocar serviço",
+  slug,
+  serviceId,
 }: {
   slots: Record<string, string[]>;
   timezone: string;
@@ -31,6 +34,10 @@ export function DayTimePicker({
   onSelect: (isoInicio: string) => void;
   onBack: () => void;
   backLabel?: string;
+  // Quando informados, mostra a opção de entrar na lista de espera se não
+  // houver nenhum horário disponível.
+  slug?: string;
+  serviceId?: string;
 }) {
   const dates = Object.keys(slots).sort();
   const [manuallySelectedDate, setManuallySelectedDate] = useState<string | null>(null);
@@ -52,9 +59,12 @@ export function DayTimePicker({
           Buscando horários disponíveis...
         </div>
       ) : dates.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">
-          Nenhum horário disponível nos próximos dias. Tente novamente mais tarde.
-        </p>
+        <div className="space-y-4">
+          <p className="py-2 text-center text-sm text-muted-foreground">
+            Nenhum horário disponível nos próximos dias.
+          </p>
+          {slug && serviceId ? <JoinWaitlistForm slug={slug} serviceId={serviceId} /> : null}
+        </div>
       ) : (
         <>
           <div className="flex gap-2 overflow-x-auto pb-1">

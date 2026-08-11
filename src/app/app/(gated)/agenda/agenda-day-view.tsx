@@ -15,6 +15,7 @@ import { DayNavigator } from "./day-navigator";
 import { AppointmentCard } from "./appointment-card";
 import { AgendaTimelineView, domIdForDayItem } from "./agenda-timeline-view";
 import { PaymentModal } from "./payment-modal";
+import { AdvancePaymentDialog } from "./advance-payment-dialog";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { BlockTimeDialog } from "./block-time-dialog";
 import { CancelAppointmentDialog } from "./cancel-appointment-dialog";
@@ -33,6 +34,8 @@ export function AgendaDayView({
   businessId,
   timezone,
   nomeLoja,
+  slug,
+  whatsappTemplate,
   dataSelecionada,
   hojeStr,
   services,
@@ -47,6 +50,8 @@ export function AgendaDayView({
   timezone: string;
   bufferPadrao: number;
   nomeLoja: string;
+  slug: string;
+  whatsappTemplate: string | null;
   dataSelecionada: string;
   hojeStr: string;
   services: AgendaService[];
@@ -63,6 +68,7 @@ export function AgendaDayView({
   const [payments, setPayments] = useState(paymentsIniciais);
   const [paymentTarget, setPaymentTarget] = useState<AgendaAppointment | null>(null);
   const [paymentFormKey, setPaymentFormKey] = useState(0);
+  const [chargeTarget, setChargeTarget] = useState<AgendaAppointment | null>(null);
   const [busca, setBusca] = useState("");
   const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"lista" | "grade">("lista");
@@ -163,6 +169,17 @@ export function AgendaDayView({
   const paymentService = paymentTarget ? (servicesById.get(paymentTarget.service_id) ?? null) : null;
   const paymentClient = paymentTarget ? (clientsById.get(paymentTarget.client_id) ?? null) : null;
   const paymentExisting = paymentTarget ? paymentsByAppointment.get(paymentTarget.id) : undefined;
+
+  function handleAdvanceLinkCreated(appointmentId: string, valor: number) {
+    // Reflete "pendente" na hora, sem esperar recarregar a página — o
+    // webhook do Mercado Pago é quem confirma de verdade quando o cliente
+    // pagar (ver /api/webhooks/mercadopago?saldo=).
+    setAppointments((prev) =>
+      prev.map((a) =>
+        a.id === appointmentId ? { ...a, entrada_status: "pendente", entrada_valor: valor } : a,
+      ),
+    );
+  }
 
   function handleBlockCreated(block: AgendaBlock) {
     setBlocks((prev) => [...prev, block].sort((a, b) => a.inicio.localeCompare(b.inicio)));
@@ -348,10 +365,13 @@ export function AgendaDayView({
                   clientPlan={clientPlanByClient.get(item.appointment.client_id)}
                   timezone={timezone}
                   nomeLoja={nomeLoja}
+                  slug={slug}
+                  whatsappTemplate={whatsappTemplate}
                   onConfirm={() => updateStatus(item.appointment.id, "confirmado")}
                   onCancel={() => setCancelTarget(item.appointment)}
                   onNoShow={() => updateStatus(item.appointment.id, "nao_compareceu")}
                   onComplete={() => openPaymentModal(item.appointment)}
+                  onChargeAdvance={() => setChargeTarget(item.appointment)}
                 />
               </li>
             );
@@ -374,6 +394,16 @@ export function AgendaDayView({
         appointment={cancelTarget}
         onOpenChange={(open) => !open && setCancelTarget(null)}
         onConfirm={handleConfirmCancel}
+      />
+
+      <AdvancePaymentDialog
+        open={chargeTarget !== null}
+        onOpenChange={(open) => !open && setChargeTarget(null)}
+        appointment={chargeTarget}
+        service={chargeTarget ? servicesById.get(chargeTarget.service_id) : undefined}
+        client={chargeTarget ? clientsById.get(chargeTarget.client_id) : undefined}
+        nomeLoja={nomeLoja}
+        onLinkCreated={handleAdvanceLinkCreated}
       />
     </div>
   );

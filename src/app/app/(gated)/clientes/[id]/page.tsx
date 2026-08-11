@@ -12,7 +12,7 @@ const getClientAndBusiness = cache(async (id: string) => {
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, nome, telefone, observacoes, criado_em")
+    .select("id, nome, telefone, observacoes, data_nascimento, criado_em")
     .eq("id", id)
     .eq("business_id", business!.id)
     .maybeSingle();

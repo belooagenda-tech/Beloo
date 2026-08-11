@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnBusiness } from "@/lib/supabase/session";
 import { normalizarPeriodo, resolvePeriodo } from "./period";
@@ -7,6 +8,8 @@ import { aggregateByFormaPagamento, aggregateByService, bucketByPeriod } from ".
 import { PeriodFilter } from "./period-filter";
 import { ExpiringPlans } from "./expiring-plans";
 import { ExportCsvButton } from "./export-csv-button";
+import { PrintReportButton } from "./print-report-button";
+import { MonthlyRevenueCard } from "./monthly-revenue-card";
 
 // recharts é uma dependência pesada — carregar sob demanda mantém o bundle
 // inicial das outras rotas de /app livre desse peso.
@@ -44,6 +47,13 @@ function localDateAddDays(dateStr: string, dias: number) {
   return `${y}-${m}-${d}`;
 }
 
+// "yyyy-MM" do mês anterior ao informado.
+function mesAnterior(anoMes: string): string {
+  const [ano, mes] = anoMes.split("-").map(Number);
+  const data = new Date(ano, mes - 1 - 1, 1);
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default async function FinanceiroPage({
   searchParams,
 }: {
@@ -56,15 +66,37 @@ export default async function FinanceiroPage({
   const periodo = normalizarPeriodo(periodoParam);
   const { de, ate, ateStr } = resolvePeriodo(periodo, business!.timezone);
 
-  const [{ data: paymentsRaw }, { data: services }, { data: activeSubs }] = await Promise.all([
-    supabase
-      .from("appointment_payments")
-      .select("appointment_id, valor, forma_pagamento, origem, pago_em, appointments(service_id)")
-      .gte("pago_em", de.toISOString())
-      .lte("pago_em", ate.toISOString()),
-    supabase.from("services").select("id, nome").eq("business_id", business!.id),
-    supabase.from("client_plan_subs").select("id, client_id, plan_id, data_renovacao").eq("ativo", true),
-  ]);
+  // Faturamento do mês atual x mês anterior — sempre pelo calendário (mês
+  // civil), independente do filtro de período escolhido acima (que pode
+  // estar em "7 dias" ou "90 dias"). Uma query só cobrindo os dois meses,
+  // separados em memória pela data de pagamento.
+  const hojeStr = formatInTimeZone(new Date(), business!.timezone, "yyyy-MM-dd");
+  const anoMesAtual = hojeStr.slice(0, 7);
+  const inicioMesAtual = fromZonedTime(`${anoMesAtual}-01T00:00:00`, business!.timezone);
+  const inicioMesAnterior = fromZonedTime(`${mesAnterior(anoMesAtual)}-01T00:00:00`, business!.timezone);
+
+  const [{ data: paymentsRaw }, { data: services }, { data: activeSubs }, { data: paymentsComparacao }] =
+    await Promise.all([
+      supabase
+        .from("appointment_payments")
+        .select("appointment_id, valor, forma_pagamento, origem, pago_em, appointments(service_id)")
+        .gte("pago_em", de.toISOString())
+        .lte("pago_em", ate.toISOString()),
+      supabase.from("services").select("id, nome").eq("business_id", business!.id),
+      supabase.from("client_plan_subs").select("id, client_id, plan_id, data_renovacao").eq("ativo", true),
+      supabase
+        .from("appointment_payments")
+        .select("valor, pago_em")
+        .gte("pago_em", inicioMesAnterior.toISOString())
+        .lte("pago_em", new Date().toISOString()),
+    ]);
+
+  let totalMesAtual = 0;
+  let totalMesAnterior = 0;
+  for (const p of paymentsComparacao ?? []) {
+    if (new Date(p.pago_em) >= inicioMesAtual) totalMesAtual += p.valor;
+    else totalMesAnterior += p.valor;
+  }
 
   const paymentEmbedRows = (paymentsRaw ?? []) as unknown as PaymentEmbedRow[];
   const paymentsTyped: FinancePayment[] = paymentEmbedRows.map((p) => ({
@@ -128,15 +160,27 @@ export default async function FinanceiroPage({
             Faturamento avulso e o retorno estimado dos seus planos.
           </p>
         </div>
-        <ExportCsvButton
-          periodo={periodo}
-          byPeriod={byPeriod}
-          byService={byService}
-          byFormaPagamento={byFormaPagamento}
-        />
+        <div className="flex flex-wrap gap-2 print:hidden">
+          <ExportCsvButton
+            periodo={periodo}
+            byPeriod={byPeriod}
+            byService={byService}
+            byFormaPagamento={byFormaPagamento}
+          />
+          <PrintReportButton />
+        </div>
       </div>
 
-      <PeriodFilter periodo={periodo} />
+      <div className="print:hidden">
+        <PeriodFilter periodo={periodo} />
+      </div>
+
+      <MonthlyRevenueCard
+        businessId={business!.id}
+        totalMesAtual={totalMesAtual}
+        totalMesAnterior={totalMesAnterior}
+        metaInicial={business!.meta_faturamento_mensal}
+      />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card>

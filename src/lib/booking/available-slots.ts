@@ -20,6 +20,15 @@ export type BusyAppointment = {
   bufferMin: number;
 };
 
+// Bloqueio recorrente (ex.: toda segunda-feira de manhã) — diferente de
+// agenda_blocks (pontual, uma data específica), aqui vale toda semana no
+// mesmo dia/horário. Ver supabase/migrations/20260811000005_recurring_blocks.sql.
+export type RecurringBlockRule = {
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fim: string;
+};
+
 export type ComputeSlotsParams = {
   timezone: string;
   now: Date;
@@ -30,6 +39,7 @@ export type ComputeSlotsParams = {
   businessHours: BusinessHourBlock[];
   exceptions: ExceptionBlock[];
   busyAppointments: BusyAppointment[];
+  recurringBlocks?: RecurringBlockRule[];
 };
 
 type Interval = { start: Date; end: Date };
@@ -81,6 +91,7 @@ export function computeAvailableSlots(params: ComputeSlotsParams): Record<string
     businessHours,
     exceptions,
     busyAppointments,
+    recurringBlocks = [],
   } = params;
 
   const minStart = addMinutes(now, antecedenciaMinutos);
@@ -123,6 +134,16 @@ export function computeAvailableSlots(params: ComputeSlotsParams): Record<string
       blocks = hoursByWeekday.get(weekday) ?? [];
     }
 
+    // Bloqueios recorrentes que caem nesse dia da semana, já instanciados
+    // como intervalos concretos desse dia — tratados como mais um "ocupado",
+    // igual busyIntervals (que vem de agendamentos reais).
+    const recurringBusyToday: Interval[] = recurringBlocks
+      .filter((r) => r.dia_semana === weekday)
+      .map((r) => ({
+        start: fromZonedTime(`${dateStr}T${toHHMMSS(r.hora_inicio)}`, timezone),
+        end: fromZonedTime(`${dateStr}T${toHHMMSS(r.hora_fim)}`, timezone),
+      }));
+
     const daySlots: Date[] = [];
 
     for (const block of blocks) {
@@ -130,9 +151,9 @@ export function computeAvailableSlots(params: ComputeSlotsParams): Record<string
       const blockEnd = fromZonedTime(`${dateStr}T${toHHMMSS(block.hora_fim)}`, timezone);
       if (blockEnd <= blockStart) continue;
 
-      const overlappingBusy = busyIntervals.filter(
-        (b) => b.end > blockStart && b.start < blockEnd,
-      );
+      const overlappingBusy = [...busyIntervals, ...recurringBusyToday]
+        .filter((b) => b.end > blockStart && b.start < blockEnd)
+        .sort((a, b) => a.start.getTime() - b.start.getTime());
       const freeIntervals = subtractBusy({ start: blockStart, end: blockEnd }, overlappingBusy);
 
       for (const free of freeIntervals) {

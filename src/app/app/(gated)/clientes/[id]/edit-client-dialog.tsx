@@ -43,6 +43,7 @@ function EditClientForm({
       nome: client.nome,
       telefone: client.telefone,
       observacoes: client.observacoes ?? "",
+      dataNascimento: client.data_nascimento ?? "",
     },
   });
 
@@ -56,9 +57,10 @@ function EditClientForm({
         nome: values.nome,
         telefone: normalizePhone(values.telefone),
         observacoes: values.observacoes || null,
+        data_nascimento: values.dataNascimento || null,
       })
       .eq("id", client.id)
-      .select("id, nome, telefone, observacoes, criado_em")
+      .select("id, nome, telefone, observacoes, data_nascimento, criado_em")
       .single();
     setSubmitting(false);
 
@@ -95,6 +97,11 @@ function EditClientForm({
         {errors.telefone ? (
           <p className="text-sm text-destructive">{errors.telefone.message}</p>
         ) : null}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="nascimento-editar-cliente">Data de nascimento (opcional)</Label>
+        <Input id="nascimento-editar-cliente" type="date" {...register("dataNascimento")} />
       </div>
 
       <div className="space-y-1.5">

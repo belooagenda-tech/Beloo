@@ -132,6 +132,8 @@ export function PublicBookingFlow({
               timezone={business.timezone}
               loading={loadingSlots}
               onSelect={handleSelectSlot}
+              slug={business.slug}
+              serviceId={selectedService.id}
               onBack={() => setStep("servico")}
             />
           ) : null}

@@ -8,6 +8,7 @@ import { Logo } from "@/components/brand/logo";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ClientPushOptIn } from "@/components/client-push-opt-in";
+import { AddToCalendarButton } from "./add-to-calendar-button";
 import { subscribeClientPushByAppointmentAction } from "../actions";
 import { capitalizeFirst } from "@/lib/utils";
 
@@ -26,7 +27,7 @@ async function getConfirmationData(slug: string, appointmentId: string) {
 
   const { data: appointment } = await supabase
     .from("appointments")
-    .select("id, inicio, business_id, service_id, client_id, status, entrada_status, entrada_valor")
+    .select("id, inicio, fim, business_id, service_id, client_id, status, entrada_status, entrada_valor")
     .eq("id", appointmentId)
     .maybeSingle();
   if (!appointment) return null;
@@ -157,6 +158,13 @@ export default async function ConfirmacaoPage({
                   label="Receber lembrete por notificação"
                 />
                 <div className="mt-2 flex w-full flex-col gap-2">
+                  <AddToCalendarButton
+                    titulo={`${service?.nome ?? "Atendimento"} — ${business.nome_loja}`}
+                    descricao={`Agendamento em ${business.nome_loja} pela Beloo.`}
+                    inicioISO={appointment.inicio}
+                    fimISO={appointment.fim}
+                    local={business.nome_loja}
+                  />
                   <Button
                     variant="outline"
                     nativeButton={false}

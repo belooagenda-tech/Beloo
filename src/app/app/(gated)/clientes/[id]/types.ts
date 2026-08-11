@@ -11,6 +11,7 @@ export type ClientDetail = {
   nome: string;
   telefone: string;
   observacoes: string | null;
+  data_nascimento: string | null;
   criado_em: string;
 };
 
