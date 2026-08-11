@@ -42,6 +42,22 @@ export type AgendaPayment = {
   entrada_valor: number | null;
 };
 
+// Bloqueio pontual de horário criado direto na Agenda (ex.: almoço) — mesma
+// tabela `agenda_blocks` também é considerada como ocupado no cálculo de
+// horários livres do agendamento público (ver lib/booking/get-available-slots.ts).
+export type AgendaBlock = {
+  id: string;
+  inicio: string;
+  fim: string;
+  motivo: string | null;
+};
+
+// Item unificado do dia (agendamento OU bloqueio), usado tanto pela lista
+// quanto pela grade horária pra renderizar tudo junto, ordenado por horário.
+export type AgendaDayItem =
+  | { kind: "appointment"; inicio: string; appointment: AgendaAppointment }
+  | { kind: "block"; inicio: string; block: AgendaBlock };
+
 // Plano ativo do cliente (no máx. 1 por cliente) — carregado junto com a
 // Agenda pra mostrar "esse cliente tem plano tal" direto no card, sem
 // esperar o profissional abrir "Concluir e receber" pra descobrir.

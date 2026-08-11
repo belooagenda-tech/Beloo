@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnBusiness } from "@/lib/supabase/session";
 import { ClientProfile } from "./client-profile";
-import type { ActivePlan, PlanPaymentHistoryItem } from "./types";
+import type { ActivePlan, ClientRating, PlanPaymentHistoryItem } from "./types";
 
 const getClientAndBusiness = cache(async (id: string) => {
   const supabase = await createClient();
@@ -48,7 +48,7 @@ export default async function ClientDetailPage({
       supabase.from("services").select("id, nome").eq("business_id", business!.id),
       supabase
         .from("appointments")
-        .select("id, service_id, inicio, fim, status")
+        .select("id, service_id, inicio, fim, status, motivo_cancelamento")
         .eq("client_id", client.id)
         .order("inicio", { ascending: false }),
       supabase
@@ -66,13 +66,30 @@ export default async function ClientDetailPage({
     ]);
 
   const appointmentIds = (appointments ?? []).map((a) => a.id);
-  const { data: payments } =
+  const [{ data: payments }, { data: ratingsRaw }] =
     appointmentIds.length > 0
-      ? await supabase
-          .from("appointment_payments")
-          .select("appointment_id, valor, forma_pagamento, origem, entrada_valor")
-          .in("appointment_id", appointmentIds)
-      : { data: [] };
+      ? await Promise.all([
+          supabase
+            .from("appointment_payments")
+            .select("appointment_id, valor, forma_pagamento, origem, entrada_valor")
+            .in("appointment_id", appointmentIds),
+          supabase
+            .from("appointment_ratings")
+            .select("id, appointment_id, nota, comentario, created_at")
+            .in("appointment_id", appointmentIds)
+            .order("created_at", { ascending: false }),
+        ])
+      : [{ data: [] }, { data: [] }];
+
+  const ratings: ClientRating[] = (ratingsRaw ?? []).map((r) => ({
+    id: r.id,
+    appointmentId: r.appointment_id,
+    nota: r.nota,
+    comentario: r.comentario,
+    createdAt: r.created_at,
+  }));
+  const notaMedia =
+    ratings.length > 0 ? ratings.reduce((acc, r) => acc + r.nota, 0) / ratings.length : null;
 
   let activePlan: ActivePlan | null = null;
   let planPayments: PlanPaymentHistoryItem[] = [];
@@ -123,6 +140,7 @@ export default async function ClientDetailPage({
     <ClientProfile
       client={client}
       slug={business!.slug}
+      nomeLoja={business!.nome_loja}
       timezone={business!.timezone}
       services={services ?? []}
       appointments={appointments ?? []}
@@ -133,6 +151,8 @@ export default async function ClientDetailPage({
       totalGastoAvulso={totalGastoAvulso}
       totalVisitas={totalVisitas}
       ultimaVisita={ultimaVisita}
+      ratings={ratings}
+      notaMedia={notaMedia}
     />
   );
 }

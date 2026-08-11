@@ -1,7 +1,7 @@
 "use client";
 
 import { formatInTimeZone } from "date-fns-tz";
-import { MoreVertical } from "lucide-react";
+import { MessageCircle, MoreVertical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { evaluatePlanCoverage } from "@/lib/booking/plan-coverage";
+import { buildAppointmentReminderMessage, buildWhatsAppLink } from "@/lib/whatsapp";
 import type { AgendaAppointment, AgendaClient, AgendaClientPlan, AgendaPayment, AgendaService } from "./types";
 
-const STATUS_META: Record<
+export const STATUS_META: Record<
   AgendaAppointment["status"],
   { label: string; className: string }
 > = {
@@ -38,6 +39,7 @@ export function AppointmentCard({
   payment,
   clientPlan,
   timezone,
+  nomeLoja,
   onConfirm,
   onCancel,
   onNoShow,
@@ -49,6 +51,7 @@ export function AppointmentCard({
   payment: AgendaPayment | undefined;
   clientPlan: AgendaClientPlan | undefined;
   timezone: string;
+  nomeLoja: string;
   onConfirm: () => void;
   onCancel: () => void;
   onNoShow: () => void;
@@ -56,6 +59,21 @@ export function AppointmentCard({
 }) {
   const status = STATUS_META[appointment.status];
   const podeAgir = appointment.status === "agendado" || appointment.status === "confirmado";
+
+  // Link pronto do WhatsApp pra lembrar o cliente do horário — só faz
+  // sentido antes do atendimento acontecer (não pra concluído/cancelado).
+  const whatsappLink =
+    podeAgir && client
+      ? buildWhatsAppLink(
+          client.telefone,
+          buildAppointmentReminderMessage({
+            clienteNome: client.nome,
+            servicoNome: service?.nome ?? "seu atendimento",
+            nomeLoja,
+            dataHoraFormatada: formatInTimeZone(new Date(appointment.inicio), timezone, "dd/MM 'às' HH:mm"),
+          }),
+        )
+      : null;
 
   // Mostra o plano do cliente ANTES de concluir o atendimento, pra ajudar o
   // profissional a decidir como cobrar — depois de concluído, essa mesma
@@ -82,97 +100,119 @@ export function AppointmentCard({
 
   return (
     <Card>
-      <CardContent className="flex items-start gap-3 py-4">
-        <span
-          className="mt-1 size-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: service?.cor ?? "#7C3AED" }}
-          aria-hidden="true"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-foreground">
-              {formatInTimeZone(new Date(appointment.inicio), timezone, "HH:mm")}–
-              {formatInTimeZone(new Date(appointment.fim), timezone, "HH:mm")}
-            </p>
-            <Badge className={cn("shrink-0", status.className)} variant="secondary">
-              {status.label}
-            </Badge>
-          </div>
-          <p className="truncate text-sm text-foreground">{client?.nome ?? "Cliente"}</p>
-          {clientPlan && coverage ? (
-            <p className="mt-0.5 truncate text-xs">
-              {coverage.covered ? (
-                <span className="font-medium text-success">
-                  Tem o plano {clientPlan.planoNome} · cobre este serviço
-                  {coverage.limite !== null ? ` (${coverage.usados}/${coverage.limite} usados)` : ""}
-                </span>
-              ) : coverage.motivo === "sem_creditos" ? (
-                <span className="font-medium text-warning">
-                  Tem o plano {clientPlan.planoNome} · sem créditos deste serviço no ciclo
-                </span>
-              ) : (
-                <span className="text-muted-foreground">
-                  Tem o plano {clientPlan.planoNome} · não cobre este serviço
-                </span>
-              )}
-            </p>
-          ) : null}
-          <p className="truncate text-sm text-muted-foreground">
-            {service?.nome ?? "Serviço"}
-            {payment ? (
-              <>
-                {" "}
-                ·{" "}
-                {payment.origem === "plano"
-                  ? "incluso no plano"
-                  : payment.forma_pagamento === "misto" && payment.entrada_valor
-                    ? `${formatarPreco(payment.valor)} (${formatarPreco(payment.entrada_valor)} online + ${formatarPreco(payment.valor - payment.entrada_valor)} na hora)`
-                    : payment.forma_pagamento === "entrada_mp"
-                      ? `${formatarPreco(payment.valor)} · pago online`
-                      : formatarPreco(payment.valor)}
-              </>
+      <CardContent className="space-y-3 py-4">
+        <div className="flex items-start gap-3">
+          <span
+            className="mt-1 size-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: service?.cor ?? "#7C3AED" }}
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-foreground">
+                {formatInTimeZone(new Date(appointment.inicio), timezone, "HH:mm")}–
+                {formatInTimeZone(new Date(appointment.fim), timezone, "HH:mm")}
+              </p>
+              <Badge className={cn("shrink-0", status.className)} variant="secondary">
+                {status.label}
+              </Badge>
+            </div>
+            <p className="truncate text-sm text-foreground">{client?.nome ?? "Cliente"}</p>
+            {clientPlan && coverage ? (
+              <p className="mt-0.5 truncate text-xs">
+                {coverage.covered ? (
+                  <span className="font-medium text-success">
+                    Tem o plano {clientPlan.planoNome} · cobre este serviço
+                    {coverage.limite !== null ? ` (${coverage.usados}/${coverage.limite} usados)` : ""}
+                  </span>
+                ) : coverage.motivo === "sem_creditos" ? (
+                  <span className="font-medium text-warning">
+                    Tem o plano {clientPlan.planoNome} · sem créditos deste serviço no ciclo
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    Tem o plano {clientPlan.planoNome} · não cobre este serviço
+                  </span>
+                )}
+              </p>
             ) : null}
-          </p>
-          {entradaJaPaga > 0 ? (
-            <p className="mt-0.5 text-xs font-medium text-success">
-              Entrada paga: {formatarPreco(entradaJaPaga)}
-              {service ? ` de ${formatarPreco(service.preco)}` : ""} — falta cobrar o restante
+            <p className="truncate text-sm text-muted-foreground">
+              {service?.nome ?? "Serviço"}
+              {payment ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  {payment.origem === "plano"
+                    ? "incluso no plano"
+                    : payment.forma_pagamento === "misto" && payment.entrada_valor
+                      ? `${formatarPreco(payment.valor)} (${formatarPreco(payment.entrada_valor)} online + ${formatarPreco(payment.valor - payment.entrada_valor)} na hora)`
+                      : payment.forma_pagamento === "entrada_mp"
+                        ? `${formatarPreco(payment.valor)} · pago online`
+                        : formatarPreco(payment.valor)}
+                </>
+              ) : null}
             </p>
-          ) : null}
-          {entradaEstornada ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">Entrada estornada ao cliente</p>
-          ) : null}
+            {entradaJaPaga > 0 ? (
+              <p className="mt-0.5 text-xs font-medium text-success">
+                Entrada paga: {formatarPreco(entradaJaPaga)}
+                {service ? ` de ${formatarPreco(service.preco)}` : ""} — falta cobrar o restante
+              </p>
+            ) : null}
+            {entradaEstornada ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">Entrada estornada ao cliente</p>
+            ) : null}
+          </div>
         </div>
 
+        {/* Ações mais usadas ficam como botão visível — só as menos comuns
+            (não compareceu, cancelar) vão pro menu "⋮", pra não exigir abrir
+            um menu pra toda ação do dia a dia. */}
         {podeAgir || appointment.status === "concluido" ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon" aria-label="Ações do agendamento">
-                  <MoreVertical className="size-4" />
-                </Button>
-              }
-            />
-            <DropdownMenuContent align="end">
-              {appointment.status === "agendado" ? (
-                <DropdownMenuItem onClick={onConfirm}>Confirmar</DropdownMenuItem>
-              ) : null}
-              {podeAgir ? (
-                <DropdownMenuItem onClick={onComplete}>Concluir e receber</DropdownMenuItem>
-              ) : null}
-              {appointment.status === "concluido" ? (
-                <DropdownMenuItem onClick={onComplete}>Editar pagamento</DropdownMenuItem>
-              ) : null}
-              {podeAgir ? (
-                <DropdownMenuItem onClick={onNoShow}>Não compareceu</DropdownMenuItem>
-              ) : null}
-              {podeAgir ? (
-                <DropdownMenuItem onClick={onCancel} variant="destructive">
-                  Cancelar
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex flex-wrap items-center gap-2 pl-[22px]">
+            {appointment.status === "agendado" ? (
+              <Button type="button" size="sm" variant="outline" onClick={onConfirm}>
+                Confirmar
+              </Button>
+            ) : null}
+            {podeAgir ? (
+              <Button type="button" size="sm" onClick={onComplete}>
+                Concluir e receber
+              </Button>
+            ) : null}
+            {appointment.status === "concluido" ? (
+              <Button type="button" size="sm" variant="outline" onClick={onComplete}>
+                Editar pagamento
+              </Button>
+            ) : null}
+            {whatsappLink ? (
+              <Button
+                size="sm"
+                variant="outline"
+                nativeButton={false}
+                render={<a href={whatsappLink} target="_blank" rel="noreferrer" />}
+              >
+                <MessageCircle className="size-4" />
+                Lembrar no WhatsApp
+              </Button>
+            ) : null}
+            {podeAgir ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button variant="ghost" size="icon" aria-label="Mais ações do agendamento">
+                      <MoreVertical className="size-4" />
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={onNoShow}>Não compareceu</DropdownMenuItem>
+                  <DropdownMenuItem onClick={onCancel} variant="destructive">
+                    Cancelar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
         ) : null}
       </CardContent>
     </Card>

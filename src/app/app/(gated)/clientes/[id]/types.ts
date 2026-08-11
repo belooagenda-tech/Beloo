@@ -20,6 +20,7 @@ export type HistoryAppointment = {
   inicio: string;
   fim: string;
   status: AppointmentStatus;
+  motivo_cancelamento: string | null;
 };
 
 export type HistoryPayment = {
@@ -48,6 +49,14 @@ export type AvailablePlan = {
   valor_mensal: number;
   ciclo_dias: number;
   permite_pagamento_online: boolean;
+};
+
+export type ClientRating = {
+  id: string;
+  appointmentId: string;
+  nota: number;
+  comentario: string | null;
+  createdAt: string;
 };
 
 export type PlanPaymentHistoryItem = {

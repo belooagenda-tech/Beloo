@@ -1,7 +1,9 @@
 "use server";
 
+import { fromZonedTime } from "date-fns-tz";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOwnProfile } from "@/lib/supabase/session";
+import type { SaasSubscriptionStatus } from "@/lib/supabase/types";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -9,6 +11,50 @@ async function requireAdmin() {
   const profile = await getOwnProfile();
   if (!profile?.is_admin) return null;
   return profile;
+}
+
+// Mesmo fuso usado no relatório de comissões do Admin (ver page.tsx) — as
+// datas escolhidas aqui são só "dia", então fecham às 23:59:59 desse fuso
+// pra "até dia X" incluir o dia X inteiro.
+const ADMIN_TIMEZONE = "America/Sao_Paulo";
+
+function endOfDayInAdminTz(dateStr: string): string {
+  return fromZonedTime(`${dateStr}T23:59:59`, ADMIN_TIMEZONE).toISOString();
+}
+
+// Controle manual do vencimento de um profissional pelo Admin — prolongar um
+// trial, marcar como ativo com uma data de próxima cobrança combinada fora
+// do fluxo normal do Mercado Pago, etc. O sistema (bloqueio de acesso em
+// app/(gated)/layout.tsx) lê status/trial_ends_at/current_period_end direto
+// dessa tabela, então qualquer alteração aqui já vale na hora.
+export async function updateSubscriptionAction(input: {
+  businessId: string;
+  status: SaasSubscriptionStatus;
+  trialEndsAt: string;
+  currentPeriodEnd: string | null;
+}): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return { ok: false, error: "Sem permissão." };
+  }
+  if (!input.trialEndsAt) {
+    return { ok: false, error: "Informe a data do trial." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("saas_subscriptions")
+    .update({
+      status: input.status,
+      trial_ends_at: endOfDayInAdminTz(input.trialEndsAt),
+      current_period_end: input.currentPeriodEnd ? endOfDayInAdminTz(input.currentPeriodEnd) : null,
+    })
+    .eq("business_id", input.businessId);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível salvar. Tente novamente." };
+  }
+  return { ok: true };
 }
 
 export async function toggleBillingAction(input: {

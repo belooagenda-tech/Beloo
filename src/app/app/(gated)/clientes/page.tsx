@@ -20,6 +20,7 @@ export default async function ClientesPage() {
   return (
     <ClientsListView
       businessId={business!.id}
+      nomeLoja={business!.nome_loja}
       initialClients={clients ?? []}
       totalCount={count ?? clients?.length ?? 0}
     />

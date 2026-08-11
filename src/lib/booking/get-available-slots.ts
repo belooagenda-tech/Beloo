@@ -27,7 +27,7 @@ export async function getAvailableSlotsForService(businessId: string, serviceId:
   const now = new Date();
   const horizonEnd = new Date(now.getTime() + (business.limite_dias_futuro + 1) * 24 * 60 * 60_000);
 
-  const [{ data: hours }, { data: exceptions }, { data: appointments }, { data: services }] =
+  const [{ data: hours }, { data: exceptions }, { data: appointments }, { data: services }, { data: blocks }] =
     await Promise.all([
       supabase
         .from("business_hours")
@@ -45,14 +45,25 @@ export async function getAvailableSlotsForService(businessId: string, serviceId:
         .lt("inicio", horizonEnd.toISOString())
         .gt("fim", now.toISOString()),
       supabase.from("services").select("id, buffer_min").eq("business_id", businessId),
+      // Bloqueios pontuais criados na Agenda (ex.: almoço) — contam como
+      // ocupado igual um agendamento, sem buffer (não é um atendimento real).
+      supabase
+        .from("agenda_blocks")
+        .select("inicio, fim")
+        .eq("business_id", businessId)
+        .lt("inicio", horizonEnd.toISOString())
+        .gt("fim", now.toISOString()),
     ]);
 
   const bufferByService = new Map((services ?? []).map((s) => [s.id, s.buffer_min]));
-  const busyAppointments: BusyAppointment[] = (appointments ?? []).map((row) => ({
-    inicio: row.inicio,
-    fim: row.fim,
-    bufferMin: bufferByService.get(row.service_id) ?? business.buffer_padrao_min,
-  }));
+  const busyAppointments: BusyAppointment[] = [
+    ...(appointments ?? []).map((row) => ({
+      inicio: row.inicio,
+      fim: row.fim,
+      bufferMin: bufferByService.get(row.service_id) ?? business.buffer_padrao_min,
+    })),
+    ...(blocks ?? []).map((row) => ({ inicio: row.inicio, fim: row.fim, bufferMin: 0 })),
+  ];
 
   return computeAvailableSlots({
     timezone: business.timezone,

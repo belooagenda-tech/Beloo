@@ -16,9 +16,11 @@ import {
 const DESTINO_POR_TIPO: Record<Notification["tipo"], string> = {
   novo_agendamento: "/app/agenda",
   cancelamento: "/app/agenda",
+  reagendamento: "/app/agenda",
   entrada_paga: "/app/agenda",
   lembrete_dia: "/app/agenda",
   plano_pago: "/app/clientes",
+  avaliacao_recebida: "/app/clientes",
   assinatura_expirando: "/app/assinatura",
 };
 

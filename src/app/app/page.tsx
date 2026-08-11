@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { addDays } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnBusiness, getOwnProfile } from "@/lib/supabase/session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 
 export const metadata: Metadata = {
@@ -14,7 +16,12 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const [profile, business] = await Promise.all([getOwnProfile(), getOwnBusiness()]);
 
-  const [{ count: servicosCount }, { count: horariosCount }, { count: clientesCount }] =
+  const hojeStr = formatInTimeZone(new Date(), business!.timezone, "yyyy-MM-dd");
+  const dayStart = fromZonedTime(`${hojeStr}T00:00:00`, business!.timezone);
+  const dayEnd = addDays(dayStart, 1);
+  const agora = new Date();
+
+  const [{ count: servicosCount }, { count: horariosCount }, { count: clientesCount }, { data: agendamentosHoje }] =
     await Promise.all([
       supabase
         .from("services")
@@ -28,7 +35,22 @@ export default async function DashboardPage() {
         .from("clients")
         .select("id", { count: "exact", head: true })
         .eq("business_id", business!.id),
+      // Resumo do dia — leve o bastante pra não pesar o Painel: só id/inicio,
+      // sem juntar cliente/serviço (isso já mora na Agenda).
+      supabase
+        .from("appointments")
+        .select("id, inicio, status")
+        .eq("business_id", business!.id)
+        .neq("status", "cancelado")
+        .gte("inicio", dayStart.toISOString())
+        .lt("inicio", dayEnd.toISOString())
+        .order("inicio", { ascending: true }),
     ]);
+
+  const totalHoje = agendamentosHoje?.length ?? 0;
+  const proximoHoje = (agendamentosHoje ?? []).find(
+    (a) => new Date(a.inicio) >= agora && (a.status === "agendado" || a.status === "confirmado"),
+  );
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const publicUrl = `${siteUrl}/${business!.slug}`;
@@ -44,6 +66,34 @@ export default async function DashboardPage() {
           Aqui está um resumo rápido da sua agenda.
         </p>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="text-base">Hoje</CardTitle>
+          <Link href="/app/agenda" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            Ver agenda
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {totalHoje === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum agendamento pra hoje.</p>
+          ) : (
+            <p className="text-sm text-foreground">
+              <span className="font-semibold">{totalHoje}</span> agendamento
+              {totalHoje === 1 ? "" : "s"} hoje
+              {proximoHoje ? (
+                <>
+                  {" "}
+                  · próximo às{" "}
+                  <span className="font-semibold">
+                    {formatInTimeZone(new Date(proximoHoje.inicio), business!.timezone, "HH:mm")}
+                  </span>
+                </>
+              ) : null}
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -79,19 +129,12 @@ export default async function DashboardPage() {
                 Sem serviços, ainda não é possível receber agendamentos pelo seu link.
               </p>
             </div>
-            <Badge variant="secondary">Em breve</Badge>
+            <Link href="/app/servicos" className={buttonVariants({ size: "sm" })}>
+              Cadastrar
+            </Link>
           </CardContent>
         </Card>
       ) : null}
-
-      <p className="text-sm text-muted-foreground">
-        A agenda do dia, cadastro de serviços e o financeiro chegam nas próximas
-        partes. Continue acompanhando —{" "}
-        <Link href="/app/configuracoes" className="text-primary hover:underline">
-          suas configurações
-        </Link>{" "}
-        já estão salvas.
-      </p>
     </div>
   );
 }

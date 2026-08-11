@@ -27,6 +27,12 @@ function promptToUpdate(registration: ServiceWorkerRegistration) {
 export function RegisterServiceWorker() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+    // Em desenvolvimento o SW cacheia os chunks de /_next/static/ com
+    // estratégia "cache-first" — como o Turbopack reaproveita nomes de chunk
+    // estáveis entre rebuilds (ao contrário do build de produção, que usa
+    // hash no nome), isso trava o navegador numa versão antiga do bundle
+    // mesmo com o servidor já servindo o código novo. Só registra em produção.
+    if (process.env.NODE_ENV !== "production") return;
 
     let refreshing = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {

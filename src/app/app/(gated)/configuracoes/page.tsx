@@ -5,6 +5,7 @@ import { getAuthedUser, getOwnBusiness } from "@/lib/supabase/session";
 import { Card, CardContent } from "@/components/ui/card";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 import { BusinessInfoCard } from "./business-info-card";
+import { SocialLinksCard } from "./social-links-card";
 import { PushNotificationsCard } from "./push-notifications-card";
 import { ChangePasswordCard } from "./change-password-card";
 import { MercadoPagoCard } from "./mercadopago-card";
@@ -57,6 +58,12 @@ export default async function ConfiguracoesPage() {
         businessId={business!.id}
         nomeLoja={business!.nome_loja}
         categoria={business!.categoria}
+      />
+
+      <SocialLinksCard
+        businessId={business!.id}
+        instagramUrl={business!.instagram_url}
+        googleReviewUrl={business!.google_review_url}
       />
 
       <PushNotificationsCard profileId={user!.id} />

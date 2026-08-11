@@ -6,11 +6,11 @@ import { getOwnProfile } from "@/lib/supabase/session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BillingSettingsCard } from "./billing-settings-card";
+import { ProfessionalsTable } from "./professionals-table";
 import { DivulgadoresCard, type DivulgadorRow } from "./divulgadores-card";
 import { IndicacoesCard, type IndicacaoRow } from "./indicacoes-card";
 import { ComissoesCard, type ComissaoRow } from "./comissoes-card";
 import { normalizarPeriodo, resolvePeriodo } from "../(gated)/financeiro/period";
-import type { SaasSubscriptionStatus } from "@/lib/supabase/types";
 
 // Fuso fixo pro filtro de período do extrato de comissões — é um relatório
 // administrativo único (não por-negócio, como em Financeiro), não faz
@@ -18,18 +18,6 @@ import type { SaasSubscriptionStatus } from "@/lib/supabase/types";
 const ADMIN_TIMEZONE = "America/Sao_Paulo";
 
 export const metadata: Metadata = { title: "Admin" };
-
-const STATUS_LABEL: Record<SaasSubscriptionStatus, string> = {
-  trial: "Teste grátis",
-  ativo: "Ativo",
-  atrasado: "Atrasado",
-  cancelado: "Cancelado",
-};
-
-function formatarData(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR");
-}
 
 const PROFISSIONAIS_PAGE_SIZE = 50;
 
@@ -208,55 +196,7 @@ export default async function AdminPage({
           <CardTitle className="text-base">Profissionais ({totalBusinesses ?? linhas.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {linhas.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhum profissional cadastrado ainda.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="py-2 pr-3 font-medium">Loja</th>
-                    <th className="py-2 pr-3 font-medium">E-mail</th>
-                    <th className="py-2 pr-3 font-medium">Status</th>
-                    <th className="py-2 pr-3 font-medium">Trial até</th>
-                    <th className="py-2 pr-3 font-medium">Próxima cobrança</th>
-                    <th className="py-2 font-medium">Link público</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {linhas.map((linha) => (
-                    <tr key={linha.id} className="border-b border-border last:border-0">
-                      <td className="py-2 pr-3 font-medium text-foreground">{linha.nomeLoja}</td>
-                      <td className="py-2 pr-3 text-muted-foreground">{linha.email}</td>
-                      <td className="py-2 pr-3">
-                        <Badge variant={linha.status === "ativo" ? "secondary" : "outline"}>
-                          {STATUS_LABEL[linha.status]}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-3 text-muted-foreground">
-                        {formatarData(linha.trialEndsAt)}
-                      </td>
-                      <td className="py-2 pr-3 text-muted-foreground">
-                        {formatarData(linha.currentPeriodEnd)}
-                      </td>
-                      <td className="py-2">
-                        <a
-                          href={`${siteUrl}/${linha.slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          /{linha.slug}
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <ProfessionalsTable linhas={linhas} siteUrl={siteUrl} />
           {totalPaginas > 1 ? (
             <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
               <span>

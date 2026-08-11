@@ -6,6 +6,7 @@ import { normalizarPeriodo, resolvePeriodo } from "./period";
 import { aggregateByFormaPagamento, aggregateByService, bucketByPeriod } from "./aggregate";
 import { PeriodFilter } from "./period-filter";
 import { ExpiringPlans } from "./expiring-plans";
+import { ExportCsvButton } from "./export-csv-button";
 
 // recharts é uma dependência pesada — carregar sob demanda mantém o bundle
 // inicial das outras rotas de /app livre desse peso.
@@ -22,6 +23,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { ExpiringPlan, FinancePayment } from "./types";
 
 export const metadata: Metadata = { title: "Financeiro" };
+
+// service_id do agendamento vem embutido na query de appointment_payments
+// (relação N:1 — appointment_payments.appointment_id sempre aponta pra um
+// único appointments) em vez de uma segunda ida ao banco por id. Cast
+// explícito pelo mesmo motivo do embed em app/(gated)/agenda/page.tsx: os
+// tipos do Database são mantidos à mão e não modelam relacionamentos.
+type PaymentEmbedRow = FinancePayment & { appointments: { service_id: string } | null };
 
 function formatarPreco(preco: number) {
   return preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -48,24 +56,28 @@ export default async function FinanceiroPage({
   const periodo = normalizarPeriodo(periodoParam);
   const { de, ate, ateStr } = resolvePeriodo(periodo, business!.timezone);
 
-  const [{ data: payments }, { data: services }, { data: activeSubs }] = await Promise.all([
+  const [{ data: paymentsRaw }, { data: services }, { data: activeSubs }] = await Promise.all([
     supabase
       .from("appointment_payments")
-      .select("appointment_id, valor, forma_pagamento, origem, pago_em")
+      .select("appointment_id, valor, forma_pagamento, origem, pago_em, appointments(service_id)")
       .gte("pago_em", de.toISOString())
       .lte("pago_em", ate.toISOString()),
     supabase.from("services").select("id, nome").eq("business_id", business!.id),
     supabase.from("client_plan_subs").select("id, client_id, plan_id, data_renovacao").eq("ativo", true),
   ]);
 
-  const paymentsTyped = (payments ?? []) as FinancePayment[];
-  const appointmentIds = paymentsTyped.map((p) => p.appointment_id);
-  const { data: appointments } =
-    appointmentIds.length > 0
-      ? await supabase.from("appointments").select("id, service_id").in("id", appointmentIds)
-      : { data: [] };
-
-  const appointmentServiceMap = new Map((appointments ?? []).map((a) => [a.id, a.service_id]));
+  const paymentEmbedRows = (paymentsRaw ?? []) as unknown as PaymentEmbedRow[];
+  const paymentsTyped: FinancePayment[] = paymentEmbedRows.map((p) => ({
+    appointment_id: p.appointment_id,
+    valor: p.valor,
+    forma_pagamento: p.forma_pagamento,
+    origem: p.origem,
+    pago_em: p.pago_em,
+  }));
+  const appointmentServiceMap = new Map<string, string>();
+  for (const row of paymentEmbedRows) {
+    if (row.appointments) appointmentServiceMap.set(row.appointment_id, row.appointments.service_id);
+  }
   const servicesById = new Map((services ?? []).map((s) => [s.id, s.nome]));
 
   const byPeriod = bucketByPeriod(paymentsTyped, de, ate, business!.timezone);
@@ -92,15 +104,16 @@ export default async function FinanceiroPage({
   const clientIds = [...new Set(subsVencendo.map((s) => s.client_id))];
   const { data: clientesVencendo } =
     clientIds.length > 0
-      ? await supabase.from("clients").select("id, nome").in("id", clientIds)
+      ? await supabase.from("clients").select("id, nome, telefone").in("id", clientIds)
       : { data: [] };
-  const clienteNomeById = new Map((clientesVencendo ?? []).map((c) => [c.id, c.nome]));
+  const clienteById = new Map((clientesVencendo ?? []).map((c) => [c.id, c]));
 
   const expiringPlans: ExpiringPlan[] = subsVencendo
     .map((sub) => ({
       subId: sub.id,
       clientId: sub.client_id,
-      clientNome: clienteNomeById.get(sub.client_id) ?? "Cliente",
+      clientNome: clienteById.get(sub.client_id)?.nome ?? "Cliente",
+      clientTelefone: clienteById.get(sub.client_id)?.telefone ?? "",
       planNome: planoById.get(sub.plan_id)?.nome ?? "Plano removido",
       dataRenovacao: sub.data_renovacao,
     }))
@@ -108,11 +121,19 @@ export default async function FinanceiroPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground">Financeiro</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Faturamento avulso e o retorno estimado dos seus planos.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold text-foreground">Financeiro</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Faturamento avulso e o retorno estimado dos seus planos.
+          </p>
+        </div>
+        <ExportCsvButton
+          periodo={periodo}
+          byPeriod={byPeriod}
+          byService={byService}
+          byFormaPagamento={byFormaPagamento}
+        />
       </div>
 
       <PeriodFilter periodo={periodo} />
@@ -147,7 +168,7 @@ export default async function FinanceiroPage({
       <RevenueByPeriodChart data={byPeriod} />
       <RevenueByServiceChart data={byService} />
       <RevenueByPaymentMethodChart data={byFormaPagamento} />
-      <ExpiringPlans plans={expiringPlans} />
+      <ExpiringPlans plans={expiringPlans} nomeLoja={business!.nome_loja} />
     </div>
   );
 }

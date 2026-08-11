@@ -47,6 +47,8 @@ export type Business = {
   buffer_padrao_min: number;
   entrada_ativa: boolean;
   entrada_percentual: number;
+  instagram_url: string | null;
+  google_review_url: string | null;
   created_at: string;
 };
 
@@ -158,6 +160,7 @@ export type Appointment = {
   fim: string;
   status: AppointmentStatus;
   observacoes: string | null;
+  motivo_cancelamento: string | null;
   created_at: string;
   client_reminder_sent_at: string | null;
   entrada_status: EntradaStatus;
@@ -173,7 +176,9 @@ export type NotificationTipo =
   | "lembrete_dia"
   | "entrada_paga"
   | "plano_pago"
-  | "assinatura_expirando";
+  | "assinatura_expirando"
+  | "reagendamento"
+  | "avaliacao_recebida";
 
 export type Notification = {
   id: string;
@@ -198,6 +203,23 @@ export type AppointmentPayment = {
   pago_em: string;
   created_at: string;
   updated_at: string;
+};
+
+export type AgendaBlock = {
+  id: string;
+  business_id: string;
+  inicio: string;
+  fim: string;
+  motivo: string | null;
+  created_at: string;
+};
+
+export type AppointmentRating = {
+  id: string;
+  appointment_id: string;
+  nota: number;
+  comentario: string | null;
+  created_at: string;
 };
 
 export type PushSubscriptionRow = {
@@ -326,6 +348,8 @@ export type Database = {
       client_plan_payments: Table<ClientPlanPayment>;
       appointments: Table<Appointment>;
       appointment_payments: Table<AppointmentPayment>;
+      agenda_blocks: Table<AgendaBlock>;
+      appointment_ratings: Table<AppointmentRating>;
       mp_connections: Table<MpConnection>;
       push_subscriptions: Table<PushSubscriptionRow>;
       saas_plans: Table<SaasPlan>;
@@ -402,6 +426,42 @@ export type Database = {
           inicio: string;
           entrada_status: string;
           mp_payment_id: string | null;
+        };
+      };
+      reschedule_public_appointment: {
+        Args: {
+          p_slug: string;
+          p_appointment_id: string;
+          p_telefone: string;
+          p_novo_inicio: string;
+        };
+        Returns: {
+          appointment_id: string;
+          business_id: string;
+          profile_id: string;
+          business_timezone: string;
+          client_nome: string;
+          service_id: string;
+          service_nome: string | null;
+          inicio: string;
+        };
+      };
+      rate_public_appointment: {
+        Args: {
+          p_slug: string;
+          p_appointment_id: string;
+          p_telefone: string;
+          p_nota: number;
+          p_comentario: string | null;
+        };
+        Returns: {
+          appointment_id: string;
+          business_id: string;
+          profile_id: string;
+          client_nome: string;
+          service_nome: string | null;
+          nota: number;
+          comentario: string | null;
         };
       };
     };

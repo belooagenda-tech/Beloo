@@ -3,10 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatInTimeZone } from "date-fns-tz";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatPhoneBR } from "@/lib/phone";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { cn } from "@/lib/utils";
 import type { AppointmentStatus } from "@/lib/supabase/types";
 import { EditClientDialog } from "./edit-client-dialog";
 import { AssignPlanDialog } from "./assign-plan-dialog";
@@ -15,6 +18,7 @@ import type {
   ActivePlan,
   AvailablePlan,
   ClientDetail,
+  ClientRating,
   HistoryAppointment,
   HistoryPayment,
   PlanPaymentHistoryItem,
@@ -56,6 +60,7 @@ function formatarData(iso: string) {
 export function ClientProfile({
   client: clientInicial,
   slug,
+  nomeLoja,
   timezone,
   services,
   appointments,
@@ -66,9 +71,12 @@ export function ClientProfile({
   totalGastoAvulso,
   totalVisitas,
   ultimaVisita,
+  ratings,
+  notaMedia,
 }: {
   client: ClientDetail;
   slug: string;
+  nomeLoja: string;
   timezone: string;
   services: ServiceLookup[];
   appointments: HistoryAppointment[];
@@ -79,6 +87,8 @@ export function ClientProfile({
   totalGastoAvulso: number;
   totalVisitas: number;
   ultimaVisita: string | null;
+  ratings: ClientRating[];
+  notaMedia: number | null;
 }) {
   const [client, setClient] = useState(clientInicial);
   const servicesById = new Map(services.map((s) => [s.id, s.nome]));
@@ -102,7 +112,24 @@ export function ClientProfile({
             Cliente desde {formatarData(client.criado_em)}
           </p>
         </div>
-        <EditClientDialog client={client} onSaved={setClient} />
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            nativeButton={false}
+            render={
+              <a
+                href={buildWhatsAppLink(client.telefone, `Oi, ${client.nome}! Aqui é da ${nomeLoja}.`)}
+                target="_blank"
+                rel="noreferrer"
+              />
+            }
+          >
+            <MessageCircle className="size-4" />
+            WhatsApp
+          </Button>
+          <EditClientDialog client={client} onSaved={setClient} />
+        </div>
       </div>
 
       {client.observacoes ? (
@@ -137,6 +164,45 @@ export function ClientProfile({
           </CardContent>
         </Card>
       </div>
+
+      {ratings.length > 0 ? (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <CardTitle className="text-base">Avaliações</CardTitle>
+            <div className="flex items-center gap-1">
+              <Star className="size-4 fill-warning text-warning" />
+              <span className="text-sm font-semibold text-foreground">{notaMedia?.toFixed(1)}</span>
+              <span className="text-xs text-muted-foreground">
+                ({ratings.length} avaliaç{ratings.length === 1 ? "ão" : "ões"})
+              </span>
+            </div>
+          </CardHeader>
+          {ratings.some((r) => r.comentario) ? (
+            <CardContent className="space-y-2">
+              {ratings
+                .filter((r) => r.comentario)
+                .slice(0, 5)
+                .map((r) => (
+                  <div key={r.id} className="rounded-md border border-border px-3 py-2">
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <Star
+                          key={i}
+                          className={cn(
+                            "size-3",
+                            i < r.nota ? "fill-warning text-warning" : "text-muted-foreground",
+                          )}
+                        />
+                      ))}
+                      <span className="ml-1 text-xs text-muted-foreground">{formatarData(r.createdAt)}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-foreground">{r.comentario}</p>
+                  </div>
+                ))}
+            </CardContent>
+          ) : null}
+        </Card>
+      ) : null}
 
       {activePlan ? (
         <Card>
@@ -237,6 +303,11 @@ export function ClientProfile({
                             </>
                           ) : null}
                         </p>
+                        {appointment.status === "cancelado" && appointment.motivo_cancelamento ? (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            Motivo: {appointment.motivo_cancelamento}
+                          </p>
+                        ) : null}
                       </div>
                       <Badge className={status.className} variant="secondary">
                         {status.label}

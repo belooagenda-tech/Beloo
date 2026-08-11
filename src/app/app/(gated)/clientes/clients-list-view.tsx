@@ -10,21 +10,25 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { normalizePhone, formatPhoneBR } from "@/lib/phone";
 import { NewClientDialog } from "./new-client-dialog";
+import { InactiveClientsView } from "./inactive-clients-view";
 import { CLIENTES_PAGE_SIZE } from "./constants";
 import type { ClientListItem } from "./types";
 
 export function ClientsListView({
   businessId,
+  nomeLoja,
   initialClients,
   totalCount,
 }: {
   businessId: string;
+  nomeLoja: string;
   initialClients: ClientListItem[];
   totalCount: number;
 }) {
   const [clients, setClients] = useState(initialClients);
   const [busca, setBusca] = useState("");
   const [carregandoMais, setCarregandoMais] = useState(false);
+  const [aba, setAba] = useState<"todos" | "inativos">("todos");
 
   const haMaisParaCarregar = clients.length < totalCount;
 
@@ -70,67 +74,92 @@ export function ClientsListView({
         />
       </div>
 
-      <div className="relative">
-        <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome ou telefone"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-
-      {busca.trim() && haMaisParaCarregar ? (
-        <Alert>
-          <AlertDescription>
-            A busca considera só os {clients.length} clientes já carregados.
-            Carregue mais abaixo para incluir o restante.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {filtrados.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            {clients.length === 0
-              ? "Nenhum cliente cadastrado ainda."
-              : "Nenhum cliente encontrado para essa busca."}
-          </CardContent>
-        </Card>
-      ) : (
-        <ul className="space-y-2">
-          {filtrados.map((client) => (
-            <li key={client.id}>
-              <Link href={`/app/clientes/${client.id}`}>
-                <Card className="transition-colors hover:border-primary/40">
-                  <CardContent className="flex items-center justify-between gap-3 py-4">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {client.nome}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatPhoneBR(client.telefone)}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {!busca.trim() && haMaisParaCarregar ? (
+      <div className="inline-flex rounded-lg border border-border p-0.5">
         <Button
           type="button"
-          variant="outline"
-          className="w-full"
-          onClick={handleCarregarMais}
-          disabled={carregandoMais}
+          size="sm"
+          variant={aba === "todos" ? "secondary" : "ghost"}
+          onClick={() => setAba("todos")}
         >
-          {carregandoMais ? "Carregando..." : `Carregar mais (${totalCount - clients.length} restantes)`}
+          Todos
         </Button>
-      ) : null}
+        <Button
+          type="button"
+          size="sm"
+          variant={aba === "inativos" ? "secondary" : "ghost"}
+          onClick={() => setAba("inativos")}
+        >
+          Inativos
+        </Button>
+      </div>
+
+      {aba === "inativos" ? (
+        <InactiveClientsView businessId={businessId} nomeLoja={nomeLoja} />
+      ) : (
+        <>
+          <div className="relative">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome ou telefone"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {busca.trim() && haMaisParaCarregar ? (
+            <Alert>
+              <AlertDescription>
+                A busca considera só os {clients.length} clientes já carregados.
+                Carregue mais abaixo para incluir o restante.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {filtrados.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                {clients.length === 0
+                  ? "Nenhum cliente cadastrado ainda."
+                  : "Nenhum cliente encontrado para essa busca."}
+              </CardContent>
+            </Card>
+          ) : (
+            <ul className="space-y-2">
+              {filtrados.map((client) => (
+                <li key={client.id}>
+                  <Link href={`/app/clientes/${client.id}`}>
+                    <Card className="transition-colors hover:border-primary/40">
+                      <CardContent className="flex items-center justify-between gap-3 py-4">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {client.nome}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatPhoneBR(client.telefone)}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {!busca.trim() && haMaisParaCarregar ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleCarregarMais}
+              disabled={carregandoMais}
+            >
+              {carregandoMais ? "Carregando..." : `Carregar mais (${totalCount - clients.length} restantes)`}
+            </Button>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ export type CancelFromAgendaResult =
 
 export async function cancelAppointmentFromAgendaAction(
   appointmentId: string,
+  motivo?: string,
 ): Promise<CancelFromAgendaResult> {
   const supabase = await createClient();
   const {
@@ -50,9 +51,10 @@ export async function cancelAppointmentFromAgendaAction(
     return { ok: false, error: "Esse agendamento não pode mais ser cancelado." };
   }
 
+  const motivoNormalizado = motivo?.trim() || null;
   const { error: updateError } = await admin
     .from("appointments")
-    .update({ status: "cancelado" })
+    .update({ status: "cancelado", motivo_cancelamento: motivoNormalizado })
     .eq("id", appointmentId);
   if (updateError) {
     return { ok: false, error: "Não foi possível cancelar. Tente novamente." };

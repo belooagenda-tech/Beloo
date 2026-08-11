@@ -1,24 +1,44 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { formatInTimeZone } from "date-fns-tz";
+import { Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { normalizePhone } from "@/lib/phone";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import type { TimeBlock } from "@/lib/agenda/day-window";
 import { DayNavigator } from "./day-navigator";
 import { AppointmentCard } from "./appointment-card";
+import { AgendaTimelineView, domIdForDayItem } from "./agenda-timeline-view";
 import { PaymentModal } from "./payment-modal";
 import { NewAppointmentDialog } from "./new-appointment-dialog";
+import { BlockTimeDialog } from "./block-time-dialog";
+import { CancelAppointmentDialog } from "./cancel-appointment-dialog";
 import { cancelAppointmentFromAgendaAction } from "./actions";
-import type { AgendaAppointment, AgendaClient, AgendaClientPlan, AgendaPayment, AgendaService } from "./types";
+import type {
+  AgendaAppointment,
+  AgendaBlock,
+  AgendaClient,
+  AgendaClientPlan,
+  AgendaDayItem,
+  AgendaPayment,
+  AgendaService,
+} from "./types";
 
 export function AgendaDayView({
   businessId,
   timezone,
+  nomeLoja,
   dataSelecionada,
   hojeStr,
   services,
   appointments: appointmentsIniciais,
+  blocks: blocksIniciais,
+  dayBlocks,
   clients: clientsIniciais,
   payments: paymentsIniciais,
   clientPlans,
@@ -26,19 +46,43 @@ export function AgendaDayView({
   businessId: string;
   timezone: string;
   bufferPadrao: number;
+  nomeLoja: string;
   dataSelecionada: string;
   hojeStr: string;
   services: AgendaService[];
   appointments: AgendaAppointment[];
+  blocks: AgendaBlock[];
+  dayBlocks: TimeBlock[];
   clients: AgendaClient[];
   payments: AgendaPayment[];
   clientPlans: AgendaClientPlan[];
 }) {
   const [appointments, setAppointments] = useState(appointmentsIniciais);
+  const [blocks, setBlocks] = useState(blocksIniciais);
   const [clients, setClients] = useState(clientsIniciais);
   const [payments, setPayments] = useState(paymentsIniciais);
   const [paymentTarget, setPaymentTarget] = useState<AgendaAppointment | null>(null);
   const [paymentFormKey, setPaymentFormKey] = useState(0);
+  const [busca, setBusca] = useState("");
+  const [removingBlockId, setRemovingBlockId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"lista" | "grade">("lista");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<AgendaAppointment | null>(null);
+
+  // Clicar num item da Grade volta pra Lista (onde ficam as ações) já
+  // rolando até o card certo e destacando ele por um instante.
+  useEffect(() => {
+    if (!highlightedId) return;
+    const el = document.getElementById(highlightedId);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timeout = window.setTimeout(() => setHighlightedId(null), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [highlightedId]);
+
+  function handleSelectFromGrade(domId: string) {
+    setViewMode("lista");
+    setHighlightedId(domId);
+  }
 
   const servicesById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
   const clientsById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
@@ -62,8 +106,10 @@ export function AgendaDayView({
     toast.success("Agendamento atualizado.");
   }
 
-  async function handleCancel(id: string) {
-    const resultado = await cancelAppointmentFromAgendaAction(id);
+  async function handleConfirmCancel(motivo: string) {
+    if (!cancelTarget) return;
+    const id = cancelTarget.id;
+    const resultado = await cancelAppointmentFromAgendaAction(id, motivo);
     if (!resultado.ok) {
       toast.error(resultado.error);
       return;
@@ -80,6 +126,7 @@ export function AgendaDayView({
     } else {
       toast.success("Agendamento cancelado.");
     }
+    setCancelTarget(null);
   }
 
   function openPaymentModal(appointment: AgendaAppointment) {
@@ -117,50 +164,198 @@ export function AgendaDayView({
   const paymentClient = paymentTarget ? (clientsById.get(paymentTarget.client_id) ?? null) : null;
   const paymentExisting = paymentTarget ? paymentsByAppointment.get(paymentTarget.id) : undefined;
 
+  function handleBlockCreated(block: AgendaBlock) {
+    setBlocks((prev) => [...prev, block].sort((a, b) => a.inicio.localeCompare(b.inicio)));
+    toast.success("Horário bloqueado.");
+  }
+
+  async function handleRemoveBlock(id: string) {
+    setRemovingBlockId(id);
+    const supabase = createClient();
+    const { error } = await supabase.from("agenda_blocks").delete().eq("id", id);
+    setRemovingBlockId(null);
+    if (error) {
+      toast.error("Não foi possível remover o bloqueio.");
+      return;
+    }
+    setBlocks((prev) => prev.filter((b) => b.id !== id));
+    toast.success("Bloqueio removido.");
+  }
+
+  // Filtro em memória sobre os agendamentos já carregados do dia — sem nova
+  // query, mesmo padrão usado na busca de /app/clientes. Bloqueios não têm
+  // cliente, então continuam aparecendo independente da busca.
+  const buscaDigits = normalizePhone(busca);
+  const appointmentsFiltrados = appointments.filter((appointment) => {
+    if (!busca.trim()) return true;
+    const client = clientsById.get(appointment.client_id);
+    if (!client) return false;
+    const nomeMatch = client.nome.toLowerCase().includes(busca.trim().toLowerCase());
+    const telefoneMatch = buscaDigits.length > 0 && client.telefone.includes(buscaDigits);
+    return nomeMatch || telefoneMatch;
+  });
+
+  // Lista unificada (agendamentos + bloqueios) ordenada por horário, pra
+  // renderizar tudo junto na ordem certa do dia — usada tanto pela Lista
+  // quanto pela Grade. A Grade sempre usa todos os agendamentos do dia
+  // (ignora a busca), já que ali o objetivo é ver o dia inteiro de relance.
+  const dayItems: AgendaDayItem[] = [
+    ...appointmentsFiltrados.map((appointment): AgendaDayItem => ({
+      kind: "appointment",
+      inicio: appointment.inicio,
+      appointment,
+    })),
+    ...blocks.map((block): AgendaDayItem => ({ kind: "block", inicio: block.inicio, block })),
+  ].sort((a, b) => a.inicio.localeCompare(b.inicio));
+
+  const allDayItems: AgendaDayItem[] = [
+    ...appointments.map((appointment): AgendaDayItem => ({
+      kind: "appointment",
+      inicio: appointment.inicio,
+      appointment,
+    })),
+    ...blocks.map((block): AgendaDayItem => ({ kind: "block", inicio: block.inicio, block })),
+  ].sort((a, b) => a.inicio.localeCompare(b.inicio));
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-foreground">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Seus agendamentos do dia, com ações rápidas.
           </p>
         </div>
-        <NewAppointmentDialog
-          businessId={businessId}
-          timezone={timezone}
-          services={services}
-          dataSelecionada={dataSelecionada}
-          onCreated={handleCreated}
-        />
+        <div className="flex items-center gap-2">
+          <BlockTimeDialog
+            businessId={businessId}
+            timezone={timezone}
+            dataSelecionada={dataSelecionada}
+            onCreated={handleBlockCreated}
+          />
+          <NewAppointmentDialog
+            businessId={businessId}
+            timezone={timezone}
+            services={services}
+            dataSelecionada={dataSelecionada}
+            onCreated={handleCreated}
+          />
+        </div>
       </div>
 
-      <DayNavigator dataSelecionada={dataSelecionada} hojeStr={hojeStr} />
+      <DayNavigator businessId={businessId} timezone={timezone} dataSelecionada={dataSelecionada} hojeStr={hojeStr} />
 
-      {appointments.length === 0 ? (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {appointments.length > 0 ? (
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar cliente por nome ou telefone"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        ) : (
+          <div />
+        )}
+        <div className="inline-flex shrink-0 rounded-lg border border-border p-0.5">
+          <Button
+            type="button"
+            size="sm"
+            variant={viewMode === "lista" ? "secondary" : "ghost"}
+            onClick={() => setViewMode("lista")}
+          >
+            Lista
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={viewMode === "grade" ? "secondary" : "ghost"}
+            onClick={() => setViewMode("grade")}
+          >
+            Grade
+          </Button>
+        </div>
+      </div>
+
+      {appointments.length === 0 && blocks.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
             Nenhum agendamento para este dia.
           </CardContent>
         </Card>
+      ) : viewMode === "grade" ? (
+        <AgendaTimelineView
+          dayItems={allDayItems}
+          dayBlocks={dayBlocks}
+          timezone={timezone}
+          dataSelecionada={dataSelecionada}
+          hojeStr={hojeStr}
+          servicesById={servicesById}
+          clientsById={clientsById}
+          onSelectItem={handleSelectFromGrade}
+        />
+      ) : dayItems.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            Nenhum agendamento encontrado para essa busca.
+          </CardContent>
+        </Card>
       ) : (
         <ul className="space-y-2">
-          {appointments.map((appointment) => (
-            <li key={appointment.id}>
-              <AppointmentCard
-                appointment={appointment}
-                service={servicesById.get(appointment.service_id)}
-                client={clientsById.get(appointment.client_id)}
-                payment={paymentsByAppointment.get(appointment.id)}
-                clientPlan={clientPlanByClient.get(appointment.client_id)}
-                timezone={timezone}
-                onConfirm={() => updateStatus(appointment.id, "confirmado")}
-                onCancel={() => handleCancel(appointment.id)}
-                onNoShow={() => updateStatus(appointment.id, "nao_compareceu")}
-                onComplete={() => openPaymentModal(appointment)}
-              />
-            </li>
-          ))}
+          {dayItems.map((item) => {
+            const domId = domIdForDayItem(item);
+            const destacado = highlightedId === domId;
+            return item.kind === "block" ? (
+              <li key={domId} id={domId}>
+                <Card
+                  className={cn(
+                    "border-dashed bg-muted/30 transition-shadow",
+                    destacado && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                  )}
+                >
+                  <CardContent className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {formatInTimeZone(new Date(item.block.inicio), timezone, "HH:mm")}–
+                        {formatInTimeZone(new Date(item.block.fim), timezone, "HH:mm")}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        Horário bloqueado{item.block.motivo ? ` · ${item.block.motivo}` : ""}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remover bloqueio"
+                      disabled={removingBlockId === item.block.id}
+                      onClick={() => handleRemoveBlock(item.block.id)}
+                    >
+                      <Trash2 className="size-4 text-muted-foreground" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </li>
+            ) : (
+              <li key={domId} id={domId} className={cn(destacado && "rounded-xl ring-2 ring-primary ring-offset-2 ring-offset-background")}>
+                <AppointmentCard
+                  appointment={item.appointment}
+                  service={servicesById.get(item.appointment.service_id)}
+                  client={clientsById.get(item.appointment.client_id)}
+                  payment={paymentsByAppointment.get(item.appointment.id)}
+                  clientPlan={clientPlanByClient.get(item.appointment.client_id)}
+                  timezone={timezone}
+                  nomeLoja={nomeLoja}
+                  onConfirm={() => updateStatus(item.appointment.id, "confirmado")}
+                  onCancel={() => setCancelTarget(item.appointment)}
+                  onNoShow={() => updateStatus(item.appointment.id, "nao_compareceu")}
+                  onComplete={() => openPaymentModal(item.appointment)}
+                />
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -173,6 +368,12 @@ export function AgendaDayView({
         existingPayment={paymentExisting}
         onOpenChange={(open) => !open && setPaymentTarget(null)}
         onCompleted={handlePaymentCompleted}
+      />
+
+      <CancelAppointmentDialog
+        appointment={cancelTarget}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+        onConfirm={handleConfirmCancel}
       />
     </div>
   );

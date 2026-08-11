@@ -23,12 +23,14 @@ export function DayTimePicker({
   loading,
   onSelect,
   onBack,
+  backLabel = "Trocar serviço",
 }: {
   slots: Record<string, string[]>;
   timezone: string;
   loading: boolean;
   onSelect: (isoInicio: string) => void;
   onBack: () => void;
+  backLabel?: string;
 }) {
   const dates = Object.keys(slots).sort();
   const [manuallySelectedDate, setManuallySelectedDate] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function DayTimePicker({
     <div className="space-y-4">
       <Button type="button" variant="ghost" size="sm" onClick={onBack}>
         <ArrowLeft className="size-4" />
-        Trocar serviço
+        {backLabel}
       </Button>
 
       {loading ? (

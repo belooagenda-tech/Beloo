@@ -1,11 +1,17 @@
-import { Bell, CalendarDays, Repeat, Smartphone, Wallet } from "lucide-react";
+import { BarChart3, Bell, CalendarDays, MessageCircle, Repeat, Smartphone, Star, Wallet } from "lucide-react";
 
 const FUNCIONALIDADES = [
   {
     icon: CalendarDays,
     titulo: "Agenda inteligente",
     descricao:
-      "Os horários livres são calculados na hora, considerando a duração de cada serviço — sem risco de dois clientes no mesmo horário.",
+      "Os horários livres são calculados na hora, considerando a duração de cada serviço. Veja o dia em lista ou em grade, e confirme, conclua ou cancele com um toque — sem menus escondidos.",
+  },
+  {
+    icon: MessageCircle,
+    titulo: "Lembretes no WhatsApp",
+    descricao:
+      "Lembre o cliente do horário e chame quem sumiu de volta, direto pelo WhatsApp, com a mensagem já pronta.",
   },
   {
     icon: Wallet,
@@ -20,16 +26,28 @@ const FUNCIONALIDADES = [
       "Venda pacotes recorrentes pros seus clientes fiéis e deixe a Beloo controlar os créditos usados automaticamente.",
   },
   {
-    icon: Bell,
-    titulo: "Notificações",
+    icon: Star,
+    titulo: "Reagendamento e avaliações",
     descricao:
-      "Você recebe um aviso assim que um agendamento chega, e seus clientes podem receber lembretes antes do horário.",
+      "Seu cliente remarca, cancela e avalia o atendimento sozinho, pelo mesmo link — e você é avisado na hora de cada avaliação recebida.",
+  },
+  {
+    icon: BarChart3,
+    titulo: "Relatórios financeiros",
+    descricao:
+      "Gráficos de faturamento por período, serviço e forma de pagamento, com exportação em CSV pra sua contabilidade.",
+  },
+  {
+    icon: Bell,
+    titulo: "Notificações em tempo real",
+    descricao:
+      "Você recebe um aviso assim que um agendamento chega, é cancelado ou remarcado — e seus clientes recebem lembretes antes do horário.",
   },
   {
     icon: Smartphone,
     titulo: "Funciona em qualquer dispositivo",
     descricao:
-      "Celular, tablet ou computador — a Beloo se adapta à tela, e dá pra instalar como um app de verdade.",
+      "Celular, tablet ou computador — a Beloo se adapta à tela, e dá pra instalar como um app de verdade, sem precisar baixar nada.",
   },
 ];
 
@@ -46,12 +64,10 @@ export function FeaturesSection() {
           </p>
         </div>
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FUNCIONALIDADES.map((item, index) => (
+          {FUNCIONALIDADES.map((item) => (
             <div
               key={item.titulo}
-              className={`rounded-2xl border border-border bg-card p-6 transition-colors hover:border-primary/40 ${
-                index === FUNCIONALIDADES.length - 1 ? "sm:col-span-2 lg:col-span-1" : ""
-              }`}
+              className="rounded-2xl border border-border bg-card p-6 transition-colors hover:border-primary/40"
             >
               <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
                 <item.icon className="size-5" />

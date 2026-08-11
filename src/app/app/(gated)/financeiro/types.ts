@@ -31,6 +31,7 @@ export type ExpiringPlan = {
   subId: string;
   clientId: string;
   clientNome: string;
+  clientTelefone: string;
   planNome: string;
   dataRenovacao: string;
 };

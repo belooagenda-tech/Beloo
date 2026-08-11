@@ -92,6 +92,34 @@ describe("computeAvailableSlots", () => {
     expect(result[hoje]).toContain(`${hoje}T14:15:00-03:00`);
   });
 
+  it("não oferece horário coberto por um bloqueio pontual da Agenda (agenda_blocks)", () => {
+    // agenda_blocks entra em computeAvailableSlots pelo mesmo parâmetro
+    // busyAppointments dos agendamentos reais (ver get-available-slots.ts),
+    // só que sempre com bufferMin: 0 — é isso que este teste documenta.
+    const hoje = dateStrOf(NOW, 0);
+    const result = computeAvailableSlots({
+      timezone: TIMEZONE,
+      now: NOW,
+      antecedenciaMinutos: 0,
+      limiteDiasFuturo: 0,
+      duracaoMin: 60,
+      bufferMin: 0,
+      businessHours: HORARIO_COMERCIAL,
+      exceptions: [],
+      busyAppointments: [
+        {
+          inicio: `${hoje}T12:00:00-03:00`,
+          fim: `${hoje}T13:00:00-03:00`,
+          bufferMin: 0,
+        },
+      ],
+    });
+
+    expect(result[hoje]).not.toContain(`${hoje}T12:00:00-03:00`);
+    expect(result[hoje]).toContain(`${hoje}T11:00:00-03:00`);
+    expect(result[hoje]).toContain(`${hoje}T13:00:00-03:00`);
+  });
+
   it("não gera nenhum slot num dia marcado como folga", () => {
     const hoje = dateStrOf(NOW, 0);
     const result = computeAvailableSlots({

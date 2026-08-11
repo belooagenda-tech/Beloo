@@ -15,7 +15,7 @@ export default async function MeusAgendamentosPage({
   const supabase = createAdminClient();
   const { data: business } = await supabase
     .from("businesses")
-    .select("nome_loja, slug, timezone")
+    .select("nome_loja, slug, timezone, instagram_url, google_review_url")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -36,7 +36,13 @@ export default async function MeusAgendamentosPage({
               com {business.nome_loja}
             </p>
           </div>
-          <MyAppointmentsLookup slug={business.slug} timezone={business.timezone} />
+          <MyAppointmentsLookup
+            slug={business.slug}
+            timezone={business.timezone}
+            nomeLoja={business.nome_loja}
+            instagramUrl={business.instagram_url}
+            googleReviewUrl={business.google_review_url}
+          />
         </div>
       </main>
     </div>

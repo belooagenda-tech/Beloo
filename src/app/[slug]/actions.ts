@@ -1,6 +1,6 @@
 "use server";
 
-import { addMinutes } from "date-fns";
+import { addDays, addMinutes } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAvailableSlotsForService } from "@/lib/booking/get-available-slots";
@@ -314,10 +314,12 @@ export async function createAppointmentAction(input: {
 
 export type PublicAppointmentSummary = {
   id: string;
+  serviceId: string;
   servicoNome: string;
   inicio: string;
   status: AppointmentStatus;
   podeCancelar: boolean;
+  podeReagendar: boolean;
   entradaPaga: number;
   restanteAPagar: number;
 };
@@ -379,18 +381,336 @@ export async function findAppointmentsAction(
     const service = servicoById.get(a.service_id);
     const entradaPaga = a.entrada_status === "pago" ? (a.entrada_valor ?? 0) : 0;
     const restanteAPagar = service ? Math.max(Math.round((service.preco - entradaPaga) * 100) / 100, 0) : 0;
+    // Mesma janela mínima usada pelo cancelamento — reagendar em cima da
+    // hora tem o mesmo risco de pegar o profissional de surpresa (ver
+    // reschedule_public_appointment, que confere a mesma regra no servidor).
+    const dentroDoPrazo = new Date(a.inicio).getTime() - agora >= limiteMs;
     return {
       id: a.id,
+      serviceId: a.service_id,
       servicoNome: service?.nome ?? "Serviço",
       inicio: a.inicio,
       status: a.status,
-      podeCancelar: new Date(a.inicio).getTime() - agora >= limiteMs,
+      podeCancelar: dentroDoPrazo,
+      podeReagendar: dentroDoPrazo,
       entradaPaga,
       restanteAPagar,
     };
   });
 
   return { ok: true, agendamentos };
+}
+
+export type RescheduleAppointmentResult =
+  | { ok: true; novoInicio: string }
+  | { ok: false; error: string };
+
+export async function rescheduleAppointmentAction(
+  slug: string,
+  appointmentId: string,
+  telefone: string,
+  novoInicioISO: string,
+): Promise<RescheduleAppointmentResult> {
+  const dentroDoLimite = await checkRateLimit("public_reschedule_appointment", {
+    windowSeconds: 15 * 60,
+    maxAttempts: 10,
+  });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
+  const supabase = createAdminClient();
+  const telefoneNormalizado = normalizePhone(telefone);
+
+  // Só para formatar a mensagem de erro "até Xh antes" caso o reagendamento
+  // esteja fora do prazo — leitura pública, sem risco (mesmo padrão já usado
+  // em cancelAppointmentAction). A checagem que vale de verdade é a da RPC.
+  const { data: businessParaMensagem } = await supabase
+    .from("businesses")
+    .select("cancelamento_min_horas")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("reschedule_public_appointment", {
+    p_slug: slug,
+    p_appointment_id: appointmentId,
+    p_telefone: telefoneNormalizado,
+    p_novo_inicio: novoInicioISO,
+  });
+
+  if (rpcError || !rpcResult) {
+    if (rpcError?.code === "23P01") {
+      return { ok: false, error: "Esse horário acabou de ser preenchido. Escolha outro." };
+    }
+    if (rpcError?.code === "BL005") {
+      return { ok: false, error: "Não foi possível confirmar seus dados." };
+    }
+    if (rpcError?.code === "BL006") {
+      return { ok: false, error: "Esse agendamento não pode mais ser reagendado." };
+    }
+    if (rpcError?.code === "BL007") {
+      const horas = businessParaMensagem?.cancelamento_min_horas;
+      return {
+        ok: false,
+        error: horas
+          ? `Esse agendamento só pode ser reagendado até ${horas}h antes do horário marcado. Entre em contato direto com a loja.`
+          : "Esse agendamento não pode mais ser reagendado.",
+      };
+    }
+    if (rpcError?.code === "BL001" || rpcError?.code === "BL002" || rpcError?.code === "BL004") {
+      return { ok: false, error: "Agendamento não encontrado." };
+    }
+    return { ok: false, error: "Não foi possível reagendar. Tente novamente." };
+  }
+
+  const horario = formatInTimeZone(
+    new Date(rpcResult.inicio),
+    rpcResult.business_timezone,
+    "dd/MM 'às' HH:mm",
+  );
+
+  try {
+    await notifyProfessional(supabase, {
+      profileId: rpcResult.profile_id,
+      tipo: "reagendamento",
+      titulo: "Agendamento remarcado",
+      corpo: `${rpcResult.client_nome} remarcou ${rpcResult.service_nome ?? "um atendimento"} para ${horario}.`,
+      appointmentId: rpcResult.appointment_id,
+      url: "/app/agenda",
+    });
+  } catch {
+    // O reagendamento já foi aplicado; falha ao notificar não pode derrubar
+    // a resposta para o cliente.
+  }
+
+  return { ok: true, novoInicio: rpcResult.inicio };
+}
+
+export type AppointmentHistoryItem = {
+  id: string;
+  servicoNome: string;
+  inicio: string;
+  status: AppointmentStatus;
+  motivoCancelamento: string | null;
+};
+
+export type FindAppointmentHistoryResult =
+  | { ok: true; agendamentos: AppointmentHistoryItem[] }
+  | { ok: false; error: string };
+
+const LIMITE_HISTORICO = 30;
+
+// Agendamentos concluídos, cancelados ou não comparecidos — ficam de fora de
+// findAppointmentsAction (só mostra os futuros/ativos, usados pra
+// cancelar/reagendar). Sem isso o cliente não tinha como ver "quando foi meu
+// último atendimento" nem o motivo de um cancelamento feito pela loja.
+export async function findAppointmentHistoryAction(
+  slug: string,
+  telefone: string,
+): Promise<FindAppointmentHistoryResult> {
+  if (!isValidBrazilianPhone(telefone)) {
+    return { ok: false, error: "Informe um WhatsApp válido com DDD." };
+  }
+
+  const dentroDoLimite = await checkRateLimit("public_find_appointment_history", {
+    windowSeconds: 10 * 60,
+    maxAttempts: 20,
+  });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
+  const supabase = createAdminClient();
+  const telefoneNormalizado = normalizePhone(telefone);
+
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!business) return { ok: false, error: "Loja não encontrada." };
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("business_id", business.id)
+    .eq("telefone", telefoneNormalizado)
+    .maybeSingle();
+  if (!client) return { ok: true, agendamentos: [] };
+
+  const { data: appointments } = await supabase
+    .from("appointments")
+    .select("id, service_id, inicio, status, motivo_cancelamento")
+    .eq("client_id", client.id)
+    .in("status", ["concluido", "cancelado", "nao_compareceu"])
+    .order("inicio", { ascending: false })
+    .limit(LIMITE_HISTORICO);
+
+  const serviceIds = [...new Set((appointments ?? []).map((a) => a.service_id))];
+  const { data: services } =
+    serviceIds.length > 0
+      ? await supabase.from("services").select("id, nome").in("id", serviceIds)
+      : { data: [] };
+  const servicoNomeById = new Map((services ?? []).map((s) => [s.id, s.nome]));
+
+  const agendamentos: AppointmentHistoryItem[] = (appointments ?? []).map((a) => ({
+    id: a.id,
+    servicoNome: servicoNomeById.get(a.service_id) ?? "Serviço",
+    inicio: a.inicio,
+    status: a.status,
+    motivoCancelamento: a.motivo_cancelamento,
+  }));
+
+  return { ok: true, agendamentos };
+}
+
+export type RatableAppointment = {
+  id: string;
+  servicoNome: string;
+  inicio: string;
+};
+
+export type FindRatableAppointmentsResult =
+  | { ok: true; agendamentos: RatableAppointment[] }
+  | { ok: false; error: string };
+
+const DIAS_JANELA_AVALIACAO = 60;
+
+// Atendimentos concluídos recentemente que o cliente ainda não avaliou —
+// mostrado na mesma página de "Meus agendamentos", sem exigir nenhum
+// cadastro/login novo (o telefone já identifica o cliente, igual ao resto
+// desse fluxo público).
+export async function findRatableAppointmentsAction(
+  slug: string,
+  telefone: string,
+): Promise<FindRatableAppointmentsResult> {
+  if (!isValidBrazilianPhone(telefone)) {
+    return { ok: false, error: "Informe um WhatsApp válido com DDD." };
+  }
+
+  const dentroDoLimite = await checkRateLimit("public_find_ratable_appointments", {
+    windowSeconds: 10 * 60,
+    maxAttempts: 20,
+  });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
+  const supabase = createAdminClient();
+  const telefoneNormalizado = normalizePhone(telefone);
+
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!business) return { ok: false, error: "Loja não encontrada." };
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("business_id", business.id)
+    .eq("telefone", telefoneNormalizado)
+    .maybeSingle();
+  if (!client) return { ok: true, agendamentos: [] };
+
+  const { data: appointments } = await supabase
+    .from("appointments")
+    .select("id, service_id, inicio")
+    .eq("client_id", client.id)
+    .eq("status", "concluido")
+    .gte("inicio", addDays(new Date(), -DIAS_JANELA_AVALIACAO).toISOString())
+    .order("inicio", { ascending: false });
+
+  const appointmentIds = (appointments ?? []).map((a) => a.id);
+  const { data: ratings } =
+    appointmentIds.length > 0
+      ? await supabase.from("appointment_ratings").select("appointment_id").in("appointment_id", appointmentIds)
+      : { data: [] };
+  const jaAvaliados = new Set((ratings ?? []).map((r) => r.appointment_id));
+
+  const serviceIds = [...new Set((appointments ?? []).map((a) => a.service_id))];
+  const { data: services } =
+    serviceIds.length > 0
+      ? await supabase.from("services").select("id, nome").in("id", serviceIds)
+      : { data: [] };
+  const servicoNomeById = new Map((services ?? []).map((s) => [s.id, s.nome]));
+
+  const agendamentos: RatableAppointment[] = (appointments ?? [])
+    .filter((a) => !jaAvaliados.has(a.id))
+    .map((a) => ({
+      id: a.id,
+      servicoNome: servicoNomeById.get(a.service_id) ?? "Serviço",
+      inicio: a.inicio,
+    }));
+
+  return { ok: true, agendamentos };
+}
+
+export type RateAppointmentResult = { ok: true } | { ok: false; error: string };
+
+export async function rateAppointmentAction(
+  slug: string,
+  appointmentId: string,
+  telefone: string,
+  nota: number,
+  comentario: string,
+): Promise<RateAppointmentResult> {
+  if (!isValidBrazilianPhone(telefone)) {
+    return { ok: false, error: "Não foi possível confirmar seus dados." };
+  }
+  if (!Number.isInteger(nota) || nota < 1 || nota > 5) {
+    return { ok: false, error: "Escolha uma nota de 1 a 5." };
+  }
+
+  const dentroDoLimite = await checkRateLimit("public_rate_appointment", {
+    windowSeconds: 15 * 60,
+    maxAttempts: 20,
+  });
+  if (!dentroDoLimite) {
+    return { ok: false, error: RATE_LIMIT_MESSAGE };
+  }
+
+  const supabase = createAdminClient();
+  const telefoneNormalizado = normalizePhone(telefone);
+
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("rate_public_appointment", {
+    p_slug: slug,
+    p_appointment_id: appointmentId,
+    p_telefone: telefoneNormalizado,
+    p_nota: nota,
+    p_comentario: comentario.trim() || null,
+  });
+
+  if (rpcError || !rpcResult) {
+    if (rpcError?.code === "BL005") return { ok: false, error: "Não foi possível confirmar seus dados." };
+    if (rpcError?.code === "BL008") {
+      return { ok: false, error: "Só é possível avaliar atendimentos já concluídos." };
+    }
+    if (rpcError?.code === "BL001" || rpcError?.code === "BL004") {
+      return { ok: false, error: "Agendamento não encontrado." };
+    }
+    return { ok: false, error: "Não foi possível registrar sua avaliação. Tente novamente." };
+  }
+
+  const estrelas = "★".repeat(rpcResult.nota) + "☆".repeat(5 - rpcResult.nota);
+  try {
+    await notifyProfessional(supabase, {
+      profileId: rpcResult.profile_id,
+      tipo: "avaliacao_recebida",
+      titulo: "Nova avaliação recebida",
+      corpo: `${rpcResult.client_nome} avaliou ${rpcResult.service_nome ?? "o atendimento"} com ${estrelas}${
+        rpcResult.comentario ? `: "${rpcResult.comentario}"` : "."
+      }`,
+      appointmentId: rpcResult.appointment_id,
+      url: "/app/clientes",
+    });
+  } catch {
+    // A avaliação já foi salva; falha ao notificar não pode derrubar a
+    // resposta pro cliente.
+  }
+
+  return { ok: true };
 }
 
 export type CancelAppointmentResult = { ok: true } | { ok: false; error: string };
