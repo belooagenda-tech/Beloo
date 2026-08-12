@@ -24,6 +24,7 @@ const DESTINO_POR_TIPO: Record<Notification["tipo"], string> = {
   lista_espera: "/app/agenda",
   assinatura_expirando: "/app/assinatura",
   novo_profissional: "/app/admin",
+  divulgador_recuperacao_senha: "/app/admin",
 };
 
 function formatarRelativo(iso: string) {

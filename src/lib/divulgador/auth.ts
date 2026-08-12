@@ -96,6 +96,47 @@ export async function getSessionDivulgador(): Promise<DivulgadorSemSenha | null>
   return divulgador;
 }
 
+// Recuperação de senha do divulgador — mesma ideia de divulgador_sessions
+// (token opaco, só o hash é gravado), mas de uso único e curta duração. Não
+// existe canal de e-mail configurado ainda (sem domínio próprio verificado
+// no provedor), então o link com o token em texto puro só existe aqui, na
+// hora de notificar o admin (ver requestDivulgadorPasswordResetAction) — não
+// tem como recuperá-lo de volta a partir do hash depois.
+const PASSWORD_RESET_DURATION_MINUTOS = 60;
+
+export async function createDivulgadorPasswordResetToken(divulgadorId: string): Promise<string> {
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_DURATION_MINUTOS * 60 * 1000);
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("divulgador_password_resets").insert({
+    divulgador_id: divulgadorId,
+    token_hash: hashToken(token),
+    expires_at: expiresAt.toISOString(),
+  });
+  if (error) throw new Error("Não foi possível gerar o link de recuperação.");
+
+  return token;
+}
+
+// UPDATE condicional (não usado + não expirado) numa query só — evita a
+// janela de corrida de fazer SELECT e depois UPDATE em passos separados; se
+// o mesmo token chegar duas vezes ao mesmo tempo, só uma das chamadas
+// encontra a linha ainda com used_at nulo.
+export async function consumeDivulgadorPasswordResetToken(token: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data: reset } = await admin
+    .from("divulgador_password_resets")
+    .update({ used_at: new Date().toISOString() })
+    .eq("token_hash", hashToken(token))
+    .is("used_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .select("divulgador_id")
+    .maybeSingle();
+
+  return reset?.divulgador_id ?? null;
+}
+
 export async function destroyDivulgadorSession(): Promise<void> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;

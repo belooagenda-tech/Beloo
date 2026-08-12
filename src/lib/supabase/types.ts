@@ -183,7 +183,8 @@ export type NotificationTipo =
   | "reagendamento"
   | "avaliacao_recebida"
   | "lista_espera"
-  | "novo_profissional";
+  | "novo_profissional"
+  | "divulgador_recuperacao_senha";
 
 export type Notification = {
   id: string;
@@ -331,6 +332,15 @@ export type DivulgadorSession = {
   created_at: string;
 };
 
+export type DivulgadorPasswordReset = {
+  id: string;
+  divulgador_id: string;
+  token_hash: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
+};
+
 export type Indicacao = {
   id: string;
   divulgador_id: string;
@@ -412,6 +422,7 @@ export type Database = {
       notifications: Table<Notification>;
       divulgadores: Table<Divulgador>;
       divulgador_sessions: Table<DivulgadorSession>;
+      divulgador_password_resets: Table<DivulgadorPasswordReset>;
       indicacoes: Table<Indicacao>;
       assinaturas_stripe: Table<AssinaturaStripe>;
       comissoes_registro: Table<ComissaoRegistro>;
