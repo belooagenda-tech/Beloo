@@ -212,6 +212,7 @@ export type MpPreapprovalDetails = {
   status: string;
   chargedQuantity: number | null;
   lastChargedDate: string | null;
+  transactionAmount: number | null;
 };
 
 export async function getPreapproval(
@@ -227,6 +228,7 @@ export async function getPreapproval(
     status: data.status,
     chargedQuantity: data.summarized?.charged_quantity ?? null,
     lastChargedDate: data.summarized?.last_charged_date ?? null,
+    transactionAmount: data.auto_recurring?.transaction_amount ?? null,
   };
 }
 

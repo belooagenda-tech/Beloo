@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { constructWebhookEvent, stripe } from "@/lib/stripe/client";
 import { logError } from "@/lib/logger";
+import { getMetaUserDataForBusiness, sendCancelSubscriptionEvent, sendSubscribeEvent } from "@/lib/meta-ads/capi";
 import type { Database } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +96,19 @@ async function handleInvoicePaymentSucceeded(admin: Admin, invoice: Stripe.Invoi
   const subscription = await stripe().subscriptions.retrieve(subscriptionId);
   const currentPeriodEnd = subscription.items.data[0]?.current_period_end;
 
+  // Atômico e separado do update "geral" logo abaixo: só dispara Subscribe
+  // quando ESTE request é quem tira a assinatura de "trial" (não uma
+  // renovação, nem uma reentrega do mesmo webhook do Stripe pra essa mesma
+  // fatura — a segunda tentativa encontra status já "ativo" e não bate
+  // nenhuma linha no `.eq("status", "trial")`).
+  const { data: activation } = await admin
+    .from("saas_subscriptions")
+    .update({ status: "ativo" })
+    .eq("business_id", assinatura.profissional_id)
+    .eq("status", "trial")
+    .select("id");
+  const isFirstActivation = (activation?.length ?? 0) > 0;
+
   await admin
     .from("saas_subscriptions")
     .update({
@@ -103,6 +118,20 @@ async function handleInvoicePaymentSucceeded(admin: Admin, invoice: Stripe.Invoi
         : undefined,
     })
     .eq("business_id", assinatura.profissional_id);
+
+  // Além de "era trial", só conta como assinatura paga de verdade se a
+  // fatura realmente cobrou algo — algumas configurações de trial no Stripe
+  // emitem uma invoice.payment_succeeded de R$0 na entrada do trial, e essa
+  // não pode contar como conversão "Subscribe" pro Meta.
+  if (isFirstActivation && invoice.amount_paid > 0) {
+    const userData = await getMetaUserDataForBusiness(admin, assinatura.profissional_id);
+    await sendSubscribeEvent({
+      businessId: assinatura.profissional_id,
+      eventId: randomUUID(),
+      value: invoice.amount_paid / 100,
+      userData,
+    });
+  }
 
   if (assinatura.divulgador_id) {
     const { data: divulgador } = await admin
@@ -177,10 +206,24 @@ async function handleSubscriptionDeleted(admin: Admin, subscription: Stripe.Subs
     .maybeSingle();
   if (!assinatura) return NextResponse.json({ ok: true });
 
-  await admin
+  // Atômico, mesmo padrão do resto deste arquivo: só quem realmente tira o
+  // status de "cancelado" dispara o evento — reentrega do webhook não conta
+  // duas vezes.
+  const { data: updated } = await admin
     .from("saas_subscriptions")
     .update({ status: "cancelado" })
-    .eq("business_id", assinatura.profissional_id);
+    .eq("business_id", assinatura.profissional_id)
+    .neq("status", "cancelado")
+    .select("id");
+
+  if ((updated?.length ?? 0) > 0) {
+    const userData = await getMetaUserDataForBusiness(admin, assinatura.profissional_id);
+    await sendCancelSubscriptionEvent({
+      businessId: assinatura.profissional_id,
+      eventId: randomUUID(),
+      userData,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

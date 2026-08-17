@@ -1,8 +1,10 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createSaasCheckoutSession, cancelStripeSubscription } from "@/lib/stripe/client";
+import { getMetaUserDataForBusiness, sendCancelSubscriptionEvent } from "@/lib/meta-ads/capi";
 
 type ActionResult = { ok: true; url: string } | { ok: false; error: string };
 
@@ -111,7 +113,19 @@ export async function cancelSaasSubscriptionStripeAction(): Promise<CancelStripe
     return { ok: false, error: "Não foi possível cancelar agora. Tente novamente." };
   }
 
-  await admin.from("saas_subscriptions").update({ status: "cancelado" }).eq("business_id", own.businessId);
+  // Atômico: só dispara CancelSubscription se essa chamada realmente tirou
+  // o status de "cancelado" (evita duplo evento em duplo clique no botão).
+  const { data: updated } = await admin
+    .from("saas_subscriptions")
+    .update({ status: "cancelado" })
+    .eq("business_id", own.businessId)
+    .neq("status", "cancelado")
+    .select("id");
+
+  if ((updated?.length ?? 0) > 0) {
+    const userData = await getMetaUserDataForBusiness(admin, own.businessId);
+    await sendCancelSubscriptionEvent({ businessId: own.businessId, eventId: randomUUID(), userData });
+  }
 
   return { ok: true };
 }

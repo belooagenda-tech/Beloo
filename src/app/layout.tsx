@@ -3,6 +3,8 @@ import { Poppins, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
+import { MetaPixel } from "@/components/meta-pixel/meta-pixel";
+import { getMetaAdsSettings } from "@/lib/meta-ads/settings";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -64,11 +66,13 @@ const APPLE_SPLASH_SCREENS = [
   { w: 2048, h: 2732, dw: 1024, dh: 1366, dpr: 2 }, // iPad Pro 12.9"
 ];
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { pixelId, trackingEnabled } = await getMetaAdsSettings();
+
   return (
     <html
       lang="pt-BR"
@@ -86,6 +90,7 @@ export default function RootLayout({
         ))}
       </head>
       <body className="min-h-full flex flex-col">
+        <MetaPixel pixelId={trackingEnabled ? pixelId : null} />
         <ThemeProvider>
           {children}
           <Toaster position="top-center" />

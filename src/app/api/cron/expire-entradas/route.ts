@@ -14,6 +14,11 @@ export async function runExpireEntradas(admin: ReturnType<typeof createAdminClie
     if (cleanupError) {
       logError("cron.expire_entradas.cleanup_logs", cleanupError);
     }
+
+    const { error: cleanupMetaAdsError } = await admin.rpc("cleanup_old_meta_ads_events_log");
+    if (cleanupMetaAdsError) {
+      logError("cron.expire_entradas.cleanup_meta_ads_events_log", cleanupMetaAdsError);
+    }
   }
 
   const { data: expirados } = await admin

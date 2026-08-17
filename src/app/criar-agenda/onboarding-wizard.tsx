@@ -8,7 +8,9 @@ import { createClient } from "@/lib/supabase/client";
 import type { AccountInput, StoreInput } from "@/lib/validations/onboarding";
 import type { DiaDisponibilidade } from "@/components/availability/types";
 import { Button } from "@/components/ui/button";
+import { getFbc, getFbp } from "@/lib/meta-ads/browser";
 import { linkReferralIfPresentAction, notifyAdminsOfNewSignupAction } from "./referral-actions";
+import { trackSignupConversionAction } from "./meta-ads-actions";
 import { WizardProgress } from "./wizard-progress";
 import { AccountStep } from "./steps/account-step";
 import { StoreStep } from "./steps/store-step";
@@ -32,6 +34,11 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState<string | null>(null);
   const [reenviando, setReenviando] = useState(false);
   const [reenviado, setReenviado] = useState(false);
+  // Gerados uma vez por sessão do wizard e mandados IGUAIS pro Pixel (fbq,
+  // client) e pra Conversions API (server, ver handleStoreSubmit) do mesmo
+  // evento lógico — é assim que o Meta deduplica os dois lados.
+  const [completeRegistrationEventId] = useState(() => crypto.randomUUID());
+  const [startTrialEventId] = useState(() => crypto.randomUUID());
 
   async function handleAccountSubmit(values: AccountInput) {
     setSubmitting(true);
@@ -100,6 +107,22 @@ export function OnboardingWizard({ startStep }: { startStep: Step }) {
     linkReferralIfPresentAction(data.id).catch(() => {});
     // Idem: avisa os admins da plataforma que um novo profissional entrou.
     notifyAdminsOfNewSignupAction(data.id).catch(() => {});
+
+    // Conversão do Meta: é aqui que a loja nasce e o trial começa de verdade
+    // (trigger em saas_subscriptions) — CompleteRegistration + StartTrial
+    // client-side (fbq) e server-side (CAPI), mesmo event_id nos dois.
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "CompleteRegistration", {}, { eventID: completeRegistrationEventId });
+      window.fbq("trackCustom", "StartTrial", {}, { eventID: startTrialEventId });
+    }
+    trackSignupConversionAction({
+      businessId: data.id,
+      completeRegistrationEventId,
+      startTrialEventId,
+      fbc: getFbc(),
+      fbp: getFbp(),
+    }).catch(() => {});
+
     setStep(3);
   }
 

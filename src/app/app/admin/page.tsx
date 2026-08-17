@@ -171,17 +171,25 @@ export default async function AdminPage({
             Controle a cobrança da Beloo e acompanhe as assinaturas dos profissionais.
           </p>
         </div>
-        <Link
-          href="/app/admin/logs"
-          className="flex shrink-0 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
-        >
-          Logs
-          {logsNaoResolvidos ? (
-            <Badge className="bg-destructive/15 text-destructive" variant="secondary">
-              {logsNaoResolvidos}
-            </Badge>
-          ) : null}
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/app/admin/anuncios"
+            className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          >
+            Anúncios
+          </Link>
+          <Link
+            href="/app/admin/logs"
+            className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          >
+            Logs
+            {logsNaoResolvidos ? (
+              <Badge className="bg-destructive/15 text-destructive" variant="secondary">
+                {logsNaoResolvidos}
+              </Badge>
+            ) : null}
+          </Link>
+        </div>
       </div>
 
       <BillingSettingsCard

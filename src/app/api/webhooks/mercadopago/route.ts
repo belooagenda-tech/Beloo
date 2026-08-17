@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { addDays, addMonths, formatISO } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -7,6 +8,7 @@ import { getPayment, getPreapproval, platformAccessToken, refundPayment } from "
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { notifyProfessional } from "@/lib/push/notify";
 import { logError } from "@/lib/logger";
+import { getMetaUserDataForBusiness, sendCancelSubscriptionEvent, sendSubscribeEvent } from "@/lib/meta-ads/capi";
 import type { Database } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -389,7 +391,7 @@ async function handlePreapprovalNotification(admin: Admin, preapprovalId: string
 async function handleSaasPreapprovalNotification(admin: Admin, preapprovalId: string) {
   const { data: sub } = await admin
     .from("saas_subscriptions")
-    .select("id, status, charged_quantity_processed")
+    .select("id, business_id, status, charged_quantity_processed")
     .eq("mp_preapproval_id", preapprovalId)
     .maybeSingle();
   if (!sub) return NextResponse.json({ ok: true });
@@ -403,7 +405,24 @@ async function handleSaasPreapprovalNotification(admin: Admin, preapprovalId: st
     .eq("id", sub.id);
 
   if (preapproval.status === "cancelled" || preapproval.status === "paused") {
-    await admin.from("saas_subscriptions").update({ status: "cancelado" }).eq("id", sub.id);
+    // Atômico: só quem realmente tirar o status de "cancelado" é quem
+    // dispara o evento — webhooks duplicados (reentrega do MP) para a mesma
+    // mudança de status caem no `.neq` e não batem nenhuma linha na segunda
+    // vez, então não disparam CancelSubscription de novo.
+    const { data: updated } = await admin
+      .from("saas_subscriptions")
+      .update({ status: "cancelado" })
+      .eq("id", sub.id)
+      .neq("status", "cancelado")
+      .select("id");
+    if ((updated?.length ?? 0) > 0) {
+      const userData = await getMetaUserDataForBusiness(admin, sub.business_id);
+      await sendCancelSubscriptionEvent({
+        businessId: sub.business_id,
+        eventId: randomUUID(),
+        userData,
+      });
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -416,14 +435,35 @@ async function handleSaasPreapprovalNotification(admin: Admin, preapprovalId: st
     return NextResponse.json({ ok: true });
   }
 
-  await admin
+  // Atômico: a leitura de `sub` acima pode estar desatualizada se duas
+  // entregas do mesmo webhook chegarem quase juntas (retry do MP por
+  // timeout, por exemplo) — o `.lt` reavalia charged_quantity_processed no
+  // banco na hora do UPDATE, então só uma das duas corridas realmente
+  // aplica a mudança (a outra recebe 0 linhas afetadas). Só quem "ganha"
+  // essa corrida decide se dispara Subscribe, evitando o evento duplicado.
+  const { data: updated } = await admin
     .from("saas_subscriptions")
     .update({
       status: "ativo",
       current_period_end: addMonths(new Date(), 1).toISOString(),
       charged_quantity_processed: chargedQuantity,
     })
-    .eq("id", sub.id);
+    .eq("id", sub.id)
+    .lt("charged_quantity_processed", chargedQuantity)
+    .select("id");
+
+  // sub.status ainda reflete o valor de antes desse UPDATE (lido no começo
+  // da função) — "era trial" é exatamente a condição de "essa é a primeira
+  // cobrança confirmada", não uma renovação.
+  if ((updated?.length ?? 0) > 0 && sub.status === "trial") {
+    const userData = await getMetaUserDataForBusiness(admin, sub.business_id);
+    await sendSubscribeEvent({
+      businessId: sub.business_id,
+      eventId: randomUUID(),
+      value: preapproval.transactionAmount ?? 0,
+      userData,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

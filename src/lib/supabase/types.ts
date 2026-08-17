@@ -51,6 +51,11 @@ export type Business = {
   google_review_url: string | null;
   whatsapp_lembrete_template: string | null;
   meta_faturamento_mensal: number | null;
+  // fbc/fbp do Meta Pixel, capturados no cadastro (criar-agenda) — usados
+  // pela Conversions API pra atribuir o evento "Subscribe" (dias depois, via
+  // webhook, sem navegador aberto) ao clique no anúncio original.
+  meta_fbc: string | null;
+  meta_fbp: string | null;
   created_at: string;
 };
 
@@ -388,6 +393,33 @@ export type ErrorLog = {
   created_at: string;
 };
 
+// ============================================================================
+// Meta Ads (Pixel + Conversions API) — configuração da Beloo (não por-tenant)
+// ============================================================================
+export type MetaAdsSettings = {
+  id: string;
+  pixel_id: string | null;
+  // Gravado criptografado (ver src/lib/crypto.ts) — nunca lido de volta em
+  // texto puro pelo client.
+  access_token: string | null;
+  test_event_code: string | null;
+  tracking_enabled: boolean;
+  updated_at: string;
+};
+
+export type MetaAdsEventStatus = "success" | "error";
+
+export type MetaAdsEventLog = {
+  id: string;
+  event_name: string;
+  event_id: string | null;
+  business_id: string | null;
+  status: MetaAdsEventStatus;
+  status_code: number | null;
+  error_message: string | null;
+  created_at: string;
+};
+
 type Table<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -428,6 +460,8 @@ export type Database = {
       comissoes_registro: Table<ComissaoRegistro>;
       rate_limit_hits: Table<RateLimitHit>;
       error_logs: Table<ErrorLog>;
+      meta_ads_settings: Table<MetaAdsSettings>;
+      meta_ads_events_log: Table<MetaAdsEventLog>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -454,6 +488,10 @@ export type Database = {
         Returns: boolean;
       };
       cleanup_old_error_logs: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      cleanup_old_meta_ads_events_log: {
         Args: Record<string, never>;
         Returns: undefined;
       };
