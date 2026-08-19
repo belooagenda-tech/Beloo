@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { formatInTimeZone } from "date-fns-tz";
-import { computeAvailableSlots, type BusinessHourBlock } from "./available-slots";
+import { computeAvailableSlots, mergeAvailableSlots, type BusinessHourBlock } from "./available-slots";
 
 const TIMEZONE = "America/Sao_Paulo";
 // Segunda-feira às 08:00 (horário de Brasília) — fixo para os testes serem
@@ -217,5 +217,35 @@ describe("computeAvailableSlots", () => {
 
     expect(result[dateStrOf(NOW, 0)]).toBeDefined();
     expect(result[dateStrOf(NOW, 1)]).toBeUndefined();
+  });
+});
+
+describe("mergeAvailableSlots", () => {
+  it("une os horários de dois profissionais sem duplicar", () => {
+    const result = mergeAvailableSlots([
+      { "2026-08-10": ["2026-08-10T09:00:00-03:00", "2026-08-10T10:00:00-03:00"] },
+      { "2026-08-10": ["2026-08-10T10:00:00-03:00", "2026-08-10T11:00:00-03:00"] },
+    ]);
+
+    expect(result["2026-08-10"]).toEqual([
+      "2026-08-10T09:00:00-03:00",
+      "2026-08-10T10:00:00-03:00",
+      "2026-08-10T11:00:00-03:00",
+    ]);
+  });
+
+  it("mantém um dia disponível se pelo menos um profissional tem horário nele", () => {
+    // Profissional A de folga nesse dia (mapa vazio pra ele), profissional B
+    // trabalhando normalmente — o resultado mesclado não pode perder o dia.
+    const result = mergeAvailableSlots([
+      {},
+      { "2026-08-11": ["2026-08-11T09:00:00-03:00"] },
+    ]);
+
+    expect(result["2026-08-11"]).toEqual(["2026-08-11T09:00:00-03:00"]);
+  });
+
+  it("retorna vazio quando nenhum profissional tem horário", () => {
+    expect(mergeAvailableSlots([{}, {}])).toEqual({});
   });
 });

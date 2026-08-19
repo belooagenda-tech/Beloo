@@ -56,7 +56,55 @@ export type Business = {
   // webhook, sem navegador aberto) ao clique no anúncio original.
   meta_fbc: string | null;
   meta_fbp: string | null;
+  // Como a vitrine pública trata a escolha de profissional (aba Equipe):
+  // "cliente_escolhe" mostra um passo de seleção; "automatico" atribui o
+  // profissional elegível disponível sem perguntar (o dono pode reatribuir
+  // depois na Agenda). Irrelevante enquanto a loja não cadastra ninguém em
+  // `professionals`.
+  modo_selecao_profissional: ModoSelecaoProfissional;
   created_at: string;
+};
+
+export type ModoSelecaoProfissional = "cliente_escolhe" | "automatico";
+
+// Membro de equipe cadastrado pelo dono da loja — sem login próprio (ver
+// supabase/migrations/20260819000001_professionals.sql). Uma loja sem
+// nenhuma linha aqui se comporta exatamente como antes em todo o sistema.
+export type Professional = {
+  id: string;
+  business_id: string;
+  nome: string;
+  foto_url: string | null;
+  cor: string | null;
+  ativo: boolean;
+  usa_horario_proprio: boolean;
+  ordem: number;
+  created_at: string;
+};
+
+// Vínculo N:N entre profissional e serviço — define quem faz o quê. Um
+// serviço sem nenhum vínculo continua reservando a loja inteira como recurso
+// único no agendamento público (comportamento legado, intacto).
+export type ProfessionalService = {
+  professional_id: string;
+  service_id: string;
+};
+
+export type ProfessionalHour = {
+  id: string;
+  professional_id: string;
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fim: string;
+};
+
+export type ProfessionalException = {
+  id: string;
+  professional_id: string;
+  data: string;
+  tipo: TipoExcecao;
+  hora_inicio: string | null;
+  hora_fim: string | null;
 };
 
 export type MpConnection = {
@@ -164,6 +212,10 @@ export type Appointment = {
   business_id: string;
   client_id: string;
   service_id: string;
+  // Quem da equipe atende esse agendamento — null enquanto a loja não usa a
+  // aba Equipe, ou quando o serviço ainda não tem nenhum profissional
+  // vinculado (ver ProfessionalService).
+  professional_id: string | null;
   inicio: string;
   fim: string;
   status: AppointmentStatus;
@@ -189,7 +241,8 @@ export type NotificationTipo =
   | "avaliacao_recebida"
   | "lista_espera"
   | "novo_profissional"
-  | "divulgador_recuperacao_senha";
+  | "divulgador_recuperacao_senha"
+  | "mensagem_suporte";
 
 export type Notification = {
   id: string;
@@ -219,6 +272,9 @@ export type AppointmentPayment = {
 export type AgendaBlock = {
   id: string;
   business_id: string;
+  // null bloqueia a loja inteira (comportamento de sempre); preenchido
+  // bloqueia só a agenda desse profissional específico.
+  professional_id: string | null;
   inicio: string;
   fim: string;
   motivo: string | null;
@@ -241,6 +297,9 @@ export type WaitlistEntry = {
   nome: string;
   telefone: string;
   service_id: string | null;
+  // Profissional que o cliente pediu (opcional) — null quando o serviço não
+  // tem equipe vinculada ou o cliente não teve preferência.
+  professional_id: string | null;
   observacao: string | null;
   atendido: boolean;
   created_at: string;
@@ -382,6 +441,17 @@ export type RateLimitHit = {
   tentativas: number;
 };
 
+// Sugestão/dúvida que o profissional manda pro dono da Beloo (aba Suporte)
+// — dispara notificação (sino + push) pro Admin na hora, via notifyAdmins.
+export type SupportMessage = {
+  id: string;
+  business_id: string;
+  profile_id: string;
+  mensagem: string;
+  lida: boolean;
+  created_at: string;
+};
+
 export type ErrorLog = {
   id: string;
   scope: string;
@@ -447,6 +517,10 @@ export type Database = {
       waitlist_entries: Table<WaitlistEntry>;
       products: Table<Product>;
       appointment_products: Table<AppointmentProduct>;
+      professionals: Table<Professional>;
+      professional_services: Table<ProfessionalService>;
+      professional_hours: Table<ProfessionalHour>;
+      professional_exceptions: Table<ProfessionalException>;
       mp_connections: Table<MpConnection>;
       push_subscriptions: Table<PushSubscriptionRow>;
       saas_plans: Table<SaasPlan>;
@@ -460,6 +534,7 @@ export type Database = {
       comissoes_registro: Table<ComissaoRegistro>;
       rate_limit_hits: Table<RateLimitHit>;
       error_logs: Table<ErrorLog>;
+      support_messages: Table<SupportMessage>;
       meta_ads_settings: Table<MetaAdsSettings>;
       meta_ads_events_log: Table<MetaAdsEventLog>;
     };
@@ -471,6 +546,10 @@ export type Database = {
       };
       replace_business_hours: {
         Args: { p_business_id: string; p_hours: { dia_semana: number; hora_inicio: string; hora_fim: string }[] };
+        Returns: undefined;
+      };
+      replace_professional_hours: {
+        Args: { p_professional_id: string; p_hours: { dia_semana: number; hora_inicio: string; hora_fim: string }[] };
         Returns: undefined;
       };
       complete_appointment_payment: {
@@ -507,6 +586,7 @@ export type Database = {
           p_entrada_expira_em: string | null;
           p_max_agendamentos_futuros: number;
           p_produtos?: { product_id: string; quantidade: number }[];
+          p_professional_id?: string | null;
         };
         Returns: {
           appointment_id: string;

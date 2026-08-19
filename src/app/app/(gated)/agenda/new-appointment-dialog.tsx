@@ -29,12 +29,19 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { AgendaAppointment, AgendaClient, AgendaService } from "./types";
+import type { AgendaAppointment, AgendaClient, AgendaProfessional, AgendaService } from "./types";
+
+// Valor do <Select> pra "nenhum profissional atribuído" — o componente base
+// não aceita item com value="", então usamos um sentinel e convertemos pra
+// string vazia (=> null no insert) por fora.
+const SEM_ATRIBUIR = "__sem_atribuir__";
 
 function NewAppointmentForm({
   businessId,
   timezone,
   services,
+  professionals,
+  professionalServices,
   dataSelecionada,
   onOpenChange,
   onCreated,
@@ -42,22 +49,38 @@ function NewAppointmentForm({
   businessId: string;
   timezone: string;
   services: AgendaService[];
+  professionals: AgendaProfessional[];
+  professionalServices: { professional_id: string; service_id: string }[];
   dataSelecionada: string;
   onOpenChange: (open: boolean) => void;
   onCreated: (appointment: AgendaAppointment, client: AgendaClient) => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [professionalId, setProfessionalId] = useState<string>("");
   const {
     register,
     handleSubmit,
     control,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<ManualAppointmentInput>({
     resolver: zodResolver(manualAppointmentSchema),
     defaultValues: { data: dataSelecionada, hora: "09:00", serviceId: services[0]?.id ?? "" },
   });
+
+  const serviceIdSelecionado = watch("serviceId");
+  // Quando o serviço tem profissionais vinculados, só oferece esses; sem
+  // nenhum vínculo, oferece a equipe inteira (loja ainda não configurou
+  // quem faz o quê pra esse serviço).
+  const idsVinculados = professionalServices
+    .filter((ps) => ps.service_id === serviceIdSelecionado)
+    .map((ps) => ps.professional_id);
+  const professionaisDisponiveis =
+    idsVinculados.length > 0
+      ? professionals.filter((p) => idsVinculados.includes(p.id))
+      : professionals;
 
   function handlePickClient(client: AgendaClient) {
     setValue("nome", client.nome, { shouldValidate: true });
@@ -109,11 +132,14 @@ function NewAppointmentForm({
         business_id: businessId,
         client_id: client.id,
         service_id: service.id,
+        professional_id: professionalId || null,
         inicio: inicio.toISOString(),
         fim: fim.toISOString(),
         status: "agendado",
       })
-      .select("id, client_id, service_id, inicio, fim, status, observacoes, entrada_status, entrada_valor")
+      .select(
+        "id, client_id, service_id, professional_id, inicio, fim, status, observacoes, entrada_status, entrada_valor",
+      )
       .single();
     setSubmitting(false);
 
@@ -184,6 +210,33 @@ function NewAppointmentForm({
         ) : null}
       </div>
 
+      {professionals.length > 0 ? (
+        <div className="space-y-1.5">
+          <Label>Profissional</Label>
+          <Select
+            value={professionalId || SEM_ATRIBUIR}
+            onValueChange={(v) => setProfessionalId(!v || v === SEM_ATRIBUIR ? "" : v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(value: string | null) => {
+                  const professional = professionaisDisponiveis.find((p) => p.id === value);
+                  return professional ? professional.nome : "Sem atribuir";
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SEM_ATRIBUIR}>Sem atribuir</SelectItem>
+              {professionaisDisponiveis.map((professional) => (
+                <SelectItem key={professional.id} value={professional.id}>
+                  {professional.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="data-manual">Data</Label>
@@ -208,12 +261,16 @@ export function NewAppointmentDialog({
   businessId,
   timezone,
   services,
+  professionals,
+  professionalServices,
   dataSelecionada,
   onCreated,
 }: {
   businessId: string;
   timezone: string;
   services: AgendaService[];
+  professionals: AgendaProfessional[];
+  professionalServices: { professional_id: string; service_id: string }[];
   dataSelecionada: string;
   onCreated: (appointment: AgendaAppointment, client: AgendaClient) => void;
 }) {
@@ -251,6 +308,8 @@ export function NewAppointmentDialog({
             businessId={businessId}
             timezone={timezone}
             services={servicosAtivos}
+            professionals={professionals}
+            professionalServices={professionalServices}
             dataSelecionada={dataSelecionada}
             onOpenChange={setOpen}
             onCreated={onCreated}

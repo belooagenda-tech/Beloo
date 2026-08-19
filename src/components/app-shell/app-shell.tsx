@@ -6,6 +6,7 @@ import { AppSidebarNav } from "./app-sidebar-nav";
 import { MobileBottomNav } from "./mobile-bottom-nav";
 import { SignOutButton } from "./sign-out-button";
 import { NotificationBell } from "./notification-bell";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 
 export function AppShell({
   nomeLoja,
@@ -32,6 +33,7 @@ export function AppShell({
           <SignOutButton />
         </div>
       </header>
+      <InstallPrompt />
       <div className="flex flex-1 flex-col md:flex-row">
         <div className="print:hidden">
           <AppSidebarNav isAdmin={isAdmin} />

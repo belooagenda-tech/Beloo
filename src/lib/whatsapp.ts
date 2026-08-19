@@ -56,3 +56,22 @@ export function buildPlanRenewalMessage(params: {
   const { clienteNome, planoNome, nomeLoja, dataRenovacaoFormatada } = params;
   return `Oi, ${clienteNome}! Seu plano ${planoNome} em ${nomeLoja} vence em ${dataRenovacaoFormatada}. Vamos renovar? 😊`;
 }
+
+// Mensagem de reengajamento pro Admin da Beloo chamar um profissional
+// (dono de loja/tenant do SaaS) que assinou mas nunca configurou nada, ou
+// configurou e nunca recebeu agendamento — usada no botão de WhatsApp da
+// tabela de profissionais (ver app/app/admin/professionals-table.tsx). Uma
+// terceira variante cobre quem já está ativo, pra manter a mesma conexão
+// (o pedido não era só "cutucar quem parou", era mostrar cuidado com todo
+// mundo).
+export type StatusUsoProfissional = "sem_configuracao" | "configurado_sem_uso" | "ativo";
+
+export function buildOutreachMessage(status: StatusUsoProfissional, nomeLoja: string): string {
+  if (status === "sem_configuracao") {
+    return `Oi! Aqui é a equipe do Beloo 👋 Vi que a ${nomeLoja} criou a conta mas ainda não chegou a cadastrar os serviços. Rolou alguma dificuldade? O Beloo foi feito pra facilitar o dia a dia — agenda online, lembrete automático pros clientes, controle financeiro — e a gente quer muito te ajudar a deixar tudo pronto. Posso te ajudar agora, é rapidinho? 😊`;
+  }
+  if (status === "configurado_sem_uso") {
+    return `Oi! Aqui é a equipe do Beloo 👋 Vi que a ${nomeLoja} já configurou a agenda, mas ainda não recebeu nenhum agendamento por aqui. Queria entender se travou algo no caminho — o app foi pensado pra dar mais controle pro seu dia a dia, e a gente quer muito ver isso funcionando pra você. Posso ajudar a destravar? 💜`;
+  }
+  return `Oi! Aqui é a equipe do Beloo 👋 Vi que a ${nomeLoja} já está usando o app no dia a dia — que bom! Só passando pra saber se está tudo certo e se tem alguma sugestão ou dúvida. Qualquer coisa, é só chamar. 😊`;
+}

@@ -2,7 +2,7 @@
 
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { PaymentMethodRevenue, PeriodBucket, ServiceRevenue } from "./types";
+import type { PaymentMethodRevenue, PeriodBucket, ProfessionalRevenue, ServiceRevenue } from "./types";
 
 function toCsv(rows: string[][]): string {
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -14,11 +14,14 @@ export function ExportCsvButton({
   byPeriod,
   byService,
   byFormaPagamento,
+  byProfissional,
 }: {
   periodo: string;
   byPeriod: PeriodBucket[];
   byService: ServiceRevenue[];
   byFormaPagamento: PaymentMethodRevenue[];
+  // Vazio numa loja que não usa a aba Equipe — a seção é omitida do CSV.
+  byProfissional: ProfessionalRevenue[];
 }) {
   function handleExport() {
     const linhas: string[][] = [
@@ -33,6 +36,9 @@ export function ExportCsvButton({
       ["Faturamento por forma de pagamento"],
       ["Forma", "Total (R$)"],
       ...byFormaPagamento.map((f) => [f.label, f.total.toFixed(2)]),
+      ...(byProfissional.length > 0
+        ? [[], ["Faturamento por profissional"], ["Profissional", "Total (R$)"], ...byProfissional.map((p) => [p.nome, p.total.toFixed(2)])]
+        : []),
     ];
 
     const csv = toCsv(linhas);

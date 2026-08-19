@@ -28,8 +28,11 @@ import type {
   AgendaDayItem,
   AgendaPayment,
   AgendaProduct,
+  AgendaProfessional,
   AgendaService,
 } from "./types";
+
+const TODOS_PROFISSIONAIS = "__todos__";
 
 export function AgendaDayView({
   businessId,
@@ -47,6 +50,8 @@ export function AgendaDayView({
   payments: paymentsIniciais,
   products: productsIniciais,
   clientPlans,
+  professionals,
+  professionalServices,
 }: {
   businessId: string;
   timezone: string;
@@ -64,11 +69,14 @@ export function AgendaDayView({
   payments: AgendaPayment[];
   products: AgendaProduct[];
   clientPlans: AgendaClientPlan[];
+  professionals: AgendaProfessional[];
+  professionalServices: { professional_id: string; service_id: string }[];
 }) {
   const [appointments, setAppointments] = useState(appointmentsIniciais);
   const [blocks, setBlocks] = useState(blocksIniciais);
   const [clients, setClients] = useState(clientsIniciais);
   const [payments, setPayments] = useState(paymentsIniciais);
+  const [professionalFilter, setProfessionalFilter] = useState(TODOS_PROFISSIONAIS);
   // Produtos vendidos junto do agendamento não são editados aqui na Agenda
   // (só na vitrine pública) — não precisa de state próprio, o valor inicial
   // já é o valor definitivo pra essa tela.
@@ -99,6 +107,7 @@ export function AgendaDayView({
 
   const servicesById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
   const clientsById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
+  const professionalsById = useMemo(() => new Map(professionals.map((p) => [p.id, p])), [professionals]);
   const paymentsByAppointment = useMemo(
     () => new Map(payments.map((p) => [p.appointment_id, p])),
     [payments],
@@ -126,6 +135,24 @@ export function AgendaDayView({
     }
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     toast.success("Agendamento atualizado.");
+  }
+
+  async function handleAssignProfessional(id: string, professionalId: string) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("appointments")
+      .update({ professional_id: professionalId })
+      .eq("id", id);
+    if (error) {
+      toast.error(
+        error.code === "23P01"
+          ? "Esse profissional já tem outro agendamento nesse horário."
+          : "Não foi possível atribuir o profissional.",
+      );
+      return;
+    }
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, professional_id: professionalId } : a)));
+    toast.success("Profissional atribuído.");
   }
 
   async function handleConfirmCancel(motivo: string) {
@@ -221,6 +248,9 @@ export function AgendaDayView({
   // cliente, então continuam aparecendo independente da busca.
   const buscaDigits = normalizePhone(busca);
   const appointmentsFiltrados = appointments.filter((appointment) => {
+    if (professionalFilter !== TODOS_PROFISSIONAIS && appointment.professional_id !== professionalFilter) {
+      return false;
+    }
     if (!busca.trim()) return true;
     const client = clientsById.get(appointment.client_id);
     if (!client) return false;
@@ -265,12 +295,15 @@ export function AgendaDayView({
             businessId={businessId}
             timezone={timezone}
             dataSelecionada={dataSelecionada}
+            professionals={professionals}
             onCreated={handleBlockCreated}
           />
           <NewAppointmentDialog
             businessId={businessId}
             timezone={timezone}
             services={services}
+            professionals={professionals}
+            professionalServices={professionalServices}
             dataSelecionada={dataSelecionada}
             onCreated={handleCreated}
           />
@@ -312,6 +345,30 @@ export function AgendaDayView({
           </Button>
         </div>
       </div>
+
+      {professionals.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={professionalFilter === TODOS_PROFISSIONAIS ? "secondary" : "outline"}
+            onClick={() => setProfessionalFilter(TODOS_PROFISSIONAIS)}
+          >
+            Todos
+          </Button>
+          {professionals.map((professional) => (
+            <Button
+              key={professional.id}
+              type="button"
+              size="sm"
+              variant={professionalFilter === professional.id ? "secondary" : "outline"}
+              onClick={() => setProfessionalFilter(professional.id)}
+            >
+              {professional.nome}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {appointments.length === 0 && blocks.length === 0 ? (
         <Card className="border-dashed">
@@ -381,6 +438,12 @@ export function AgendaDayView({
                   payment={paymentsByAppointment.get(item.appointment.id)}
                   products={productsByAppointment.get(item.appointment.id) ?? []}
                   clientPlan={clientPlanByClient.get(item.appointment.client_id)}
+                  professional={
+                    item.appointment.professional_id
+                      ? professionalsById.get(item.appointment.professional_id)
+                      : undefined
+                  }
+                  professionals={professionals}
                   timezone={timezone}
                   nomeLoja={nomeLoja}
                   slug={slug}
@@ -390,6 +453,9 @@ export function AgendaDayView({
                   onNoShow={() => updateStatus(item.appointment.id, "nao_compareceu")}
                   onComplete={() => openPaymentModal(item.appointment)}
                   onChargeAdvance={() => setChargeTarget(item.appointment)}
+                  onAssignProfessional={(professionalId) =>
+                    handleAssignProfessional(item.appointment.id, professionalId)
+                  }
                 />
               </li>
             );

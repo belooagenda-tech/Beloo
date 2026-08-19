@@ -29,10 +29,17 @@ export function ServicesManager({
   businessId,
   bufferPadrao,
   initialServices,
+  professionals = [],
+  professionalServices = [],
 }: {
   businessId: string;
   bufferPadrao: number;
   initialServices: Service[];
+  // Só usados pra mostrar (somente leitura) quem faz cada serviço — o
+  // vínculo em si é editado na aba Equipe. Vazios numa loja que não usa a
+  // funcionalidade, aí essa lista simplesmente não aparece.
+  professionals?: { id: string; nome: string }[];
+  professionalServices?: { professional_id: string; service_id: string }[];
 }) {
   const [services, setServices] = useState<Service[]>(initialServices);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -90,6 +97,8 @@ export function ServicesManager({
     toast.success("Serviço excluído.");
   }
 
+  const professionalsById = new Map(professionals.map((p) => [p.id, p.nome]));
+
   return (
     <div className="space-y-4">
       <Button onClick={openCreate}>
@@ -126,6 +135,15 @@ export function ServicesManager({
                         <> · buffer padrão ({bufferPadrao} min)</>
                       )}
                     </p>
+                    {professionals.length > 0 ? (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {professionalServices
+                          .filter((ps) => ps.service_id === service.id)
+                          .map((ps) => professionalsById.get(ps.professional_id))
+                          .filter((nome): nome is string => Boolean(nome))
+                          .join(", ") || "Sem profissional vinculado (edite na aba Equipe)"}
+                      </p>
+                    ) : null}
                   </div>
                   {!service.ativo ? <Badge variant="secondary">Inativo</Badge> : null}
                   <Switch

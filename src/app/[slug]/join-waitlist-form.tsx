@@ -10,11 +10,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { PublicProfessional } from "./types";
 
-export function JoinWaitlistForm({ slug, serviceId }: { slug: string; serviceId: string }) {
+const SEM_PREFERENCIA = "__sem_preferencia__";
+
+export function JoinWaitlistForm({
+  slug,
+  serviceId,
+  professionals = [],
+}: {
+  slug: string;
+  serviceId: string;
+  professionals?: PublicProfessional[];
+}) {
   const [enviado, setEnviado] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [professionalId, setProfessionalId] = useState(SEM_PREFERENCIA);
   const {
     register,
     handleSubmit,
@@ -29,6 +48,7 @@ export function JoinWaitlistForm({ slug, serviceId }: { slug: string; serviceId:
       nome: values.nome,
       telefone: values.telefone,
       serviceId,
+      professionalId: professionalId === SEM_PREFERENCIA ? undefined : professionalId,
     });
     setSubmitting(false);
 
@@ -77,6 +97,29 @@ export function JoinWaitlistForm({ slug, serviceId }: { slug: string; serviceId:
           <p className="text-sm text-destructive">{errors.telefone.message}</p>
         ) : null}
       </div>
+      {professionals.length > 0 ? (
+        <div className="space-y-1.5">
+          <Label>Profissional (opcional)</Label>
+          <Select value={professionalId} onValueChange={(v) => setProfessionalId(v ?? SEM_PREFERENCIA)}>
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(value: string | null) => {
+                  if (!value || value === SEM_PREFERENCIA) return "Sem preferência";
+                  return professionals.find((p) => p.id === value)?.nome ?? "Sem preferência";
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SEM_PREFERENCIA}>Sem preferência</SelectItem>
+              {professionals.map((professional) => (
+                <SelectItem key={professional.id} value={professional.id}>
+                  {professional.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
       <Button type="submit" className="w-full" size="sm" disabled={submitting}>
         {submitting ? "Enviando..." : "Entrar na lista de espera"}
       </Button>

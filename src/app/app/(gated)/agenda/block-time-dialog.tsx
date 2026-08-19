@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -19,23 +26,30 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { AgendaBlock } from "./types";
+import type { AgendaBlock, AgendaProfessional } from "./types";
+
+// Valor do <Select> pra "bloquear a loja inteira" — o componente base não
+// aceita item com value="", então usamos um sentinel e convertemos pra null.
+const LOJA_INTEIRA = "__loja_inteira__";
 
 function BlockTimeForm({
   businessId,
   timezone,
   dataSelecionada,
+  professionals,
   onOpenChange,
   onCreated,
 }: {
   businessId: string;
   timezone: string;
   dataSelecionada: string;
+  professionals: AgendaProfessional[];
   onOpenChange: (open: boolean) => void;
   onCreated: (block: AgendaBlock) => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [professionalId, setProfessionalId] = useState(LOJA_INTEIRA);
   const {
     register,
     handleSubmit,
@@ -57,11 +71,12 @@ function BlockTimeForm({
       .from("agenda_blocks")
       .insert({
         business_id: businessId,
+        professional_id: professionalId === LOJA_INTEIRA ? null : professionalId,
         inicio: inicio.toISOString(),
         fim: fim.toISOString(),
         motivo: values.motivo?.trim() || null,
       })
-      .select("id, inicio, fim, motivo")
+      .select("id, professional_id, inicio, fim, motivo")
       .single();
     setSubmitting(false);
 
@@ -100,6 +115,30 @@ function BlockTimeForm({
       </div>
       {errors.horaFim ? <p className="text-sm text-destructive">{errors.horaFim.message}</p> : null}
 
+      {professionals.length > 0 ? (
+        <div className="space-y-1.5">
+          <Label>Bloquear para</Label>
+          <Select value={professionalId} onValueChange={(v) => setProfessionalId(v ?? LOJA_INTEIRA)}>
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(value: string | null) => {
+                  if (value === LOJA_INTEIRA || !value) return "Loja inteira";
+                  return professionals.find((p) => p.id === value)?.nome ?? "Loja inteira";
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={LOJA_INTEIRA}>Loja inteira</SelectItem>
+              {professionals.map((professional) => (
+                <SelectItem key={professional.id} value={professional.id}>
+                  {professional.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
       <div className="space-y-1.5">
         <Label htmlFor="motivo-bloqueio">Motivo (opcional)</Label>
         <Input
@@ -122,11 +161,13 @@ export function BlockTimeDialog({
   businessId,
   timezone,
   dataSelecionada,
+  professionals,
   onCreated,
 }: {
   businessId: string;
   timezone: string;
   dataSelecionada: string;
+  professionals: AgendaProfessional[];
   onCreated: (block: AgendaBlock) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -158,6 +199,7 @@ export function BlockTimeDialog({
             businessId={businessId}
             timezone={timezone}
             dataSelecionada={dataSelecionada}
+            professionals={professionals}
             onOpenChange={setOpen}
             onCreated={onCreated}
           />

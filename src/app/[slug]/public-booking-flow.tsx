@@ -9,28 +9,42 @@ import { CATEGORIAS } from "@/lib/constants";
 import type { ClientInfoInput } from "@/lib/validations/public-booking";
 import { getAvailableSlotsAction, createAppointmentAction } from "./actions";
 import { ServicePicker } from "./service-picker";
+import { ProfessionalPicker } from "./professional-picker";
 import { DayTimePicker } from "./day-time-picker";
 import { ProductPicker } from "./product-picker";
 import { ClientInfoForm } from "./client-info-form";
 import { PlansSection } from "./plans-section";
-import type { PublicBusiness, PublicPlan, PublicProduct, PublicService } from "./types";
+import type {
+  PublicBusiness,
+  PublicPlan,
+  PublicProduct,
+  PublicProfessional,
+  PublicService,
+} from "./types";
 
-type Step = "servico" | "horario" | "produtos" | "dados";
+type Step = "servico" | "profissional" | "horario" | "produtos" | "dados";
 
 export function PublicBookingFlow({
   business,
   services,
   plans,
   products,
+  professionals,
+  professionalServices,
 }: {
   business: PublicBusiness;
   services: PublicService[];
   plans: PublicPlan[];
   products: PublicProduct[];
+  professionals: PublicProfessional[];
+  professionalServices: { professional_id: string; service_id: string }[];
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("servico");
   const [selectedService, setSelectedService] = useState<PublicService | null>(null);
+  // undefined = sem preferência (atribuição automática); string = escolhido
+  // pelo cliente na etapa de profissional.
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | undefined>(undefined);
   const [slots, setSlots] = useState<Record<string, string[]>>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedIso, setSelectedIso] = useState<string | null>(null);
@@ -42,13 +56,48 @@ export function PublicBookingFlow({
 
   const categoriaLabel = CATEGORIAS.find((c) => c.value === business.categoria)?.label;
 
-  async function handleSelectService(service: PublicService) {
-    setSelectedService(service);
+  const professionalsById = new Map(professionals.map((p) => [p.id, p]));
+  // Profissionais elegíveis pro serviço escolhido — vazio quando o serviço
+  // ainda não tem ninguém vinculado na aba Equipe (fluxo segue igual a
+  // antes da Equipe existir, sem etapa de escolha).
+  const eligibleProfessionals = selectedService
+    ? professionalServices
+        .filter((ps) => ps.service_id === selectedService.id)
+        .map((ps) => professionalsById.get(ps.professional_id))
+        .filter((p): p is PublicProfessional => p !== undefined)
+    : [];
+  const mostraEscolhaProfissional =
+    business.modo_selecao_profissional === "cliente_escolhe" && eligibleProfessionals.length > 0;
+
+  async function fetchSlots(service: PublicService, professionalId: string | undefined) {
     setStep("horario");
     setLoadingSlots(true);
-    const result = await getAvailableSlotsAction(business.slug, service.id);
+    const result = await getAvailableSlotsAction(business.slug, service.id, professionalId);
     setSlots(result);
     setLoadingSlots(false);
+  }
+
+  async function handleSelectService(service: PublicService) {
+    setSelectedService(service);
+    setSelectedProfessionalId(undefined);
+
+    const elegiveis = professionalServices
+      .filter((ps) => ps.service_id === service.id)
+      .map((ps) => professionalsById.get(ps.professional_id))
+      .filter((p): p is PublicProfessional => p !== undefined);
+
+    if (business.modo_selecao_profissional === "cliente_escolhe" && elegiveis.length > 0) {
+      setStep("profissional");
+      return;
+    }
+
+    await fetchSlots(service, undefined);
+  }
+
+  async function handleSelectProfessional(professionalId: string | undefined) {
+    if (!selectedService) return;
+    setSelectedProfessionalId(professionalId);
+    await fetchSlots(selectedService, professionalId);
   }
 
   function handleSelectSlot(iso: string) {
@@ -75,6 +124,7 @@ export function PublicBookingFlow({
       telefone: values.telefone,
       empresa: values.empresa,
       produtos: produtosSelecionados,
+      professionalId: selectedProfessionalId,
     });
 
     if (!result.ok) {
@@ -146,6 +196,14 @@ export function PublicBookingFlow({
             </div>
           ) : null}
 
+          {step === "profissional" && selectedService ? (
+            <ProfessionalPicker
+              professionals={eligibleProfessionals}
+              onSelect={handleSelectProfessional}
+              onBack={() => setStep("servico")}
+            />
+          ) : null}
+
           {step === "horario" && selectedService ? (
             <DayTimePicker
               slots={slots}
@@ -154,7 +212,9 @@ export function PublicBookingFlow({
               onSelect={handleSelectSlot}
               slug={business.slug}
               serviceId={selectedService.id}
-              onBack={() => setStep("servico")}
+              professionals={eligibleProfessionals}
+              backLabel={mostraEscolhaProfissional ? "Trocar profissional" : "Trocar serviço"}
+              onBack={() => setStep(mostraEscolhaProfissional ? "profissional" : "servico")}
             />
           ) : null}
 

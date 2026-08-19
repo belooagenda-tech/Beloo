@@ -19,6 +19,9 @@ export type AgendaAppointment = {
   id: string;
   client_id: string;
   service_id: string;
+  // Quem da equipe atende — null quando a loja não usa a aba Equipe ou o
+  // serviço ainda não tem ninguém vinculado.
+  professional_id: string | null;
   inicio: string;
   fim: string;
   status: AppointmentStatus;
@@ -31,6 +34,14 @@ export type AgendaClient = {
   id: string;
   nome: string;
   telefone: string;
+};
+
+export type AgendaProfessional = {
+  id: string;
+  nome: string;
+  foto_url: string | null;
+  cor: string | null;
+  ativo: boolean;
 };
 
 export type AgendaPayment = {
@@ -58,6 +69,8 @@ export type AgendaProduct = {
 // horários livres do agendamento público (ver lib/booking/get-available-slots.ts).
 export type AgendaBlock = {
   id: string;
+  // null bloqueia a loja inteira; preenchido bloqueia só esse profissional.
+  professional_id: string | null;
   inicio: string;
   fim: string;
   motivo: string | null;

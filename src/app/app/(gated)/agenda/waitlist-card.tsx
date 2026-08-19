@@ -14,6 +14,7 @@ export type WaitlistEntryRow = {
   telefone: string;
   observacao: string | null;
   servicoNome: string | null;
+  profissionalNome: string | null;
 };
 
 export function WaitlistCard({
@@ -58,7 +59,10 @@ export function WaitlistCard({
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-foreground">{entry.nome}</p>
-                <p className="text-xs text-muted-foreground">{entry.servicoNome ?? "Qualquer serviço"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {entry.servicoNome ?? "Qualquer serviço"}
+                  {entry.profissionalNome ? ` · com ${entry.profissionalNome}` : ""}
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button

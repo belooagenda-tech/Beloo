@@ -7,6 +7,7 @@ export type PublicBusiness = {
   timezone: string;
   entrada_ativa: boolean;
   entrada_percentual: number;
+  modo_selecao_profissional: "cliente_escolhe" | "automatico";
 };
 
 export type PublicService = {
@@ -14,6 +15,14 @@ export type PublicService = {
   nome: string;
   duracao_min: number;
   preco: number;
+};
+
+// Membro de equipe visível na vitrine (aba Equipe) — só aparece quando o
+// serviço escolhido tem pelo menos um profissional vinculado.
+export type PublicProfessional = {
+  id: string;
+  nome: string;
+  foto_url: string | null;
 };
 
 export type PublicProduct = {

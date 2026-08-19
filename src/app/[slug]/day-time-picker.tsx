@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, capitalizeFirst } from "@/lib/utils";
 import { JoinWaitlistForm } from "./join-waitlist-form";
+import type { PublicProfessional } from "./types";
 
 function formatarRotuloDia(dateStr: string) {
   const [ano, mes, dia] = dateStr.split("-").map(Number);
@@ -27,6 +28,7 @@ export function DayTimePicker({
   backLabel = "Trocar serviço",
   slug,
   serviceId,
+  professionals,
 }: {
   slots: Record<string, string[]>;
   timezone: string;
@@ -38,6 +40,10 @@ export function DayTimePicker({
   // houver nenhum horário disponível.
   slug?: string;
   serviceId?: string;
+  // Profissionais elegíveis pro serviço escolhido (vazio = serviço sem
+  // equipe vinculada) — repassado pra oferecer a mesma escolha na lista de
+  // espera.
+  professionals?: PublicProfessional[];
 }) {
   const dates = Object.keys(slots).sort();
   const [manuallySelectedDate, setManuallySelectedDate] = useState<string | null>(null);
@@ -63,7 +69,9 @@ export function DayTimePicker({
           <p className="py-2 text-center text-sm text-muted-foreground">
             Nenhum horário disponível nos próximos dias.
           </p>
-          {slug && serviceId ? <JoinWaitlistForm slug={slug} serviceId={serviceId} /> : null}
+          {slug && serviceId ? (
+            <JoinWaitlistForm slug={slug} serviceId={serviceId} professionals={professionals ?? []} />
+          ) : null}
         </div>
       ) : (
         <>

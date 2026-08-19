@@ -9,11 +9,23 @@ export default async function ServicosPage() {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
-  const { data: services } = await supabase
-    .from("services")
-    .select("id, business_id, nome, duracao_min, preco, buffer_min, cor, ativo, created_at")
-    .eq("business_id", business!.id)
-    .order("created_at", { ascending: true });
+  const [{ data: services }, { data: professionals }] = await Promise.all([
+    supabase
+      .from("services")
+      .select("id, business_id, nome, duracao_min, preco, buffer_min, cor, ativo, created_at")
+      .eq("business_id", business!.id)
+      .order("created_at", { ascending: true }),
+    supabase.from("professionals").select("id, nome").eq("business_id", business!.id),
+  ]);
+
+  const professionalIds = (professionals ?? []).map((p) => p.id);
+  const { data: professionalServices } =
+    professionalIds.length > 0
+      ? await supabase
+          .from("professional_services")
+          .select("professional_id, service_id")
+          .in("professional_id", professionalIds)
+      : { data: [] };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -33,6 +45,8 @@ export default async function ServicosPage() {
         businessId={business!.id}
         bufferPadrao={business!.buffer_padrao_min}
         initialServices={services ?? []}
+        professionals={professionals ?? []}
+        professionalServices={professionalServices ?? []}
       />
     </div>
   );

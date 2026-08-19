@@ -21,6 +21,14 @@ export type ServiceRevenue = {
   total: number;
 };
 
+// Vazio numa loja que não usa a aba Equipe — os cards/gráficos de
+// profissional simplesmente não aparecem nesse caso (ver page.tsx).
+export type ProfessionalRevenue = {
+  professionalId: string;
+  nome: string;
+  total: number;
+};
+
 export type PaymentMethodRevenue = {
   forma: FormaPagamento;
   label: string;

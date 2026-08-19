@@ -1,7 +1,7 @@
 "use client";
 
 import { formatInTimeZone } from "date-fns-tz";
-import { CircleDollarSign, Clock3, MessageCircle, MoreVertical } from "lucide-react";
+import { CircleDollarSign, Clock3, MessageCircle, MoreVertical, UserCog } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import type {
   AgendaClientPlan,
   AgendaPayment,
   AgendaProduct,
+  AgendaProfessional,
   AgendaService,
 } from "./types";
 
@@ -46,6 +47,8 @@ export function AppointmentCard({
   payment,
   products,
   clientPlan,
+  professional,
+  professionals,
   timezone,
   nomeLoja,
   slug,
@@ -55,6 +58,7 @@ export function AppointmentCard({
   onNoShow,
   onComplete,
   onChargeAdvance,
+  onAssignProfessional,
 }: {
   appointment: AgendaAppointment;
   service: AgendaService | undefined;
@@ -62,6 +66,11 @@ export function AppointmentCard({
   payment: AgendaPayment | undefined;
   products: AgendaProduct[];
   clientPlan: AgendaClientPlan | undefined;
+  // Profissional já atribuído a esse agendamento (se houver) e a lista
+  // completa da equipe (pra oferecer atribuição rápida quando não há
+  // ninguém atribuído ainda) — ambos vazios numa loja que não usa a Equipe.
+  professional: AgendaProfessional | undefined;
+  professionals: AgendaProfessional[];
   timezone: string;
   nomeLoja: string;
   slug: string;
@@ -71,6 +80,7 @@ export function AppointmentCard({
   onNoShow: () => void;
   onComplete: () => void;
   onChargeAdvance: () => void;
+  onAssignProfessional: (professionalId: string) => void;
 }) {
   const status = STATUS_META[appointment.status];
   const podeAgir = appointment.status === "agendado" || appointment.status === "confirmado";
@@ -143,6 +153,37 @@ export function AppointmentCard({
               </Badge>
             </div>
             <p className="truncate text-sm text-foreground">{client?.nome ?? "Cliente"}</p>
+            {professional ? (
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                <span
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: professional.cor ?? "#7C3AED" }}
+                  aria-hidden="true"
+                />
+                {professional.nome}
+              </p>
+            ) : professionals.length > 0 && podeAgir ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="mt-0.5 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      <UserCog className="size-3" />
+                      Atribuir profissional
+                    </button>
+                  }
+                />
+                <DropdownMenuContent align="start">
+                  {professionals.map((p) => (
+                    <DropdownMenuItem key={p.id} onClick={() => onAssignProfessional(p.id)}>
+                      {p.nome}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
             {clientPlan && coverage ? (
               <p className="mt-0.5 truncate text-xs">
                 {coverage.covered ? (

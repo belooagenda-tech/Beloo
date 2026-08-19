@@ -28,6 +28,7 @@ type WaitlistEmbedRow = {
   telefone: string;
   observacao: string | null;
   services: { nome: string } | null;
+  professionals: { nome: string } | null;
 };
 
 export default async function AgendaPage({
@@ -52,6 +53,7 @@ export default async function AgendaPage({
     { data: businessHours },
     { data: dayExceptions },
     { data: waitlistRaw },
+    { data: professionals },
   ] = await Promise.all([
     supabase
       .from("services")
@@ -64,7 +66,7 @@ export default async function AgendaPage({
     supabase
       .from("appointments")
       .select(
-        "id, client_id, service_id, inicio, fim, status, observacoes, entrada_status, entrada_valor, clients(id, nome, telefone), appointment_payments(id, appointment_id, valor, forma_pagamento, origem, entrada_valor), appointment_products(id, appointment_id, nome_snapshot, preco_snapshot, quantidade)",
+        "id, client_id, service_id, professional_id, inicio, fim, status, observacoes, entrada_status, entrada_valor, clients(id, nome, telefone), appointment_payments(id, appointment_id, valor, forma_pagamento, origem, entrada_valor), appointment_products(id, appointment_id, nome_snapshot, preco_snapshot, quantidade)",
       )
       .eq("business_id", business!.id)
       .gte("inicio", dayStart.toISOString())
@@ -72,7 +74,7 @@ export default async function AgendaPage({
       .order("inicio", { ascending: true }),
     supabase
       .from("agenda_blocks")
-      .select("id, inicio, fim, motivo")
+      .select("id, professional_id, inicio, fim, motivo")
       .eq("business_id", business!.id)
       .gte("inicio", dayStart.toISOString())
       .lt("inicio", dayEnd.toISOString())
@@ -89,11 +91,28 @@ export default async function AgendaPage({
     // Agenda pra sempre ficar visível, independente do dia selecionado.
     supabase
       .from("waitlist_entries")
-      .select("id, nome, telefone, observacao, services(nome)")
+      .select("id, nome, telefone, observacao, services(nome), professionals(nome)")
       .eq("business_id", business!.id)
       .eq("atendido", false)
       .order("created_at", { ascending: true }),
+    // Equipe (aba Equipe) — vazio numa loja que não usa a funcionalidade,
+    // aí a Agenda continua exatamente como antes.
+    supabase
+      .from("professionals")
+      .select("id, nome, foto_url, cor, ativo")
+      .eq("business_id", business!.id)
+      .eq("ativo", true)
+      .order("ordem", { ascending: true }),
   ]);
+
+  const professionalIds = (professionals ?? []).map((p) => p.id);
+  const { data: professionalServices } =
+    professionalIds.length > 0
+      ? await supabase
+          .from("professional_services")
+          .select("professional_id, service_id")
+          .in("professional_id", professionalIds)
+      : { data: [] };
 
   const waitlistEntries: WaitlistEntryRow[] = ((waitlistRaw ?? []) as unknown as WaitlistEmbedRow[]).map(
     (row) => ({
@@ -102,6 +121,7 @@ export default async function AgendaPage({
       telefone: row.telefone,
       observacao: row.observacao,
       servicoNome: row.services?.nome ?? null,
+      profissionalNome: row.professionals?.nome ?? null,
     }),
   );
 
@@ -190,6 +210,8 @@ export default async function AgendaPage({
         payments={payments}
         products={products}
         clientPlans={clientPlans}
+        professionals={professionals ?? []}
+        professionalServices={professionalServices ?? []}
       />
     </div>
   );

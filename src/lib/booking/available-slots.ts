@@ -171,3 +171,29 @@ export function computeAvailableSlots(params: ComputeSlotsParams): Record<string
 
   return result;
 }
+
+// União de vários mapas data -> horários[] (um por profissional elegível)
+// num só, sem duplicados e ordenado — representa "pelo menos um profissional
+// livre nesse horário". Usado quando o cliente não escolhe profissional
+// (modo automático da loja, ou "sem preferência" na vitrine): cada
+// profissional roda computeAvailableSlots separadamente, com sua própria
+// disponibilidade e agenda, e o resultado é mesclado aqui. Formato de saída
+// idêntico ao de computeAvailableSlots, então quem consome não precisa saber
+// se veio de 1 profissional ou de vários.
+export function mergeAvailableSlots(maps: Record<string, string[]>[]): Record<string, string[]> {
+  const merged = new Map<string, Set<string>>();
+
+  for (const map of maps) {
+    for (const [data, horarios] of Object.entries(map)) {
+      const set = merged.get(data) ?? new Set<string>();
+      for (const horario of horarios) set.add(horario);
+      merged.set(data, set);
+    }
+  }
+
+  const result: Record<string, string[]> = {};
+  for (const [data, set] of merged) {
+    result[data] = [...set].sort();
+  }
+  return result;
+}

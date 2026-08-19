@@ -2,7 +2,13 @@ import { formatInTimeZone } from "date-fns-tz";
 import { differenceInCalendarDays, startOfWeek } from "date-fns";
 import type { FormaPagamento } from "@/lib/supabase/types";
 import { FORMA_PAGAMENTO_LABELS } from "@/lib/payments/forma-pagamento";
-import type { FinancePayment, PaymentMethodRevenue, PeriodBucket, ServiceRevenue } from "./types";
+import type {
+  FinancePayment,
+  PaymentMethodRevenue,
+  PeriodBucket,
+  ProfessionalRevenue,
+  ServiceRevenue,
+} from "./types";
 
 export function bucketByPeriod(
   payments: FinancePayment[],
@@ -71,6 +77,39 @@ export function aggregateByService(
   const principais = ordenado.slice(0, limite - 1);
   const outros = ordenado.slice(limite - 1).reduce((acc, item) => acc + item.total, 0);
   return [...principais, { serviceId: "outros", nome: "Outros", total: outros }];
+}
+
+// Mesmo padrão de aggregateByService — soma por profissional (via o
+// professional_id embutido no agendamento de cada pagamento) e agrupa o
+// excedente em "Outros" além do limite. Retorna [] quando a loja não usa a
+// aba Equipe (appointmentProfessionalMap vazio nesse caso).
+export function aggregateByProfissional(
+  payments: FinancePayment[],
+  appointmentProfessionalMap: Map<string, string>,
+  professionalsById: Map<string, string>,
+  limite = 8,
+): ProfessionalRevenue[] {
+  const totals = new Map<string, number>();
+
+  for (const payment of payments) {
+    const professionalId = appointmentProfessionalMap.get(payment.appointment_id);
+    if (!professionalId) continue;
+    totals.set(professionalId, (totals.get(professionalId) ?? 0) + payment.valor);
+  }
+
+  const ordenado = [...totals.entries()]
+    .map(([professionalId, total]) => ({
+      professionalId,
+      nome: professionalsById.get(professionalId) ?? "Profissional removido",
+      total,
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  if (ordenado.length <= limite) return ordenado;
+
+  const principais = ordenado.slice(0, limite - 1);
+  const outros = ordenado.slice(limite - 1).reduce((acc, item) => acc + item.total, 0);
+  return [...principais, { professionalId: "outros", nome: "Outros", total: outros }];
 }
 
 export function aggregateByFormaPagamento(payments: FinancePayment[]): PaymentMethodRevenue[] {

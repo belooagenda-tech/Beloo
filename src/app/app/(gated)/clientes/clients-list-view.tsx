@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { normalizePhone, formatPhoneBR } from "@/lib/phone";
 import { NewClientDialog } from "./new-client-dialog";
+import { SendPromotionDialog } from "./send-promotion-dialog";
 import { InactiveClientsView } from "./inactive-clients-view";
 import { BirthdayClientsView } from "./birthday-clients-view";
 import { CLIENTES_PAGE_SIZE } from "./constants";
@@ -67,12 +68,15 @@ export function ClientsListView({
             {totalCount === 1 ? "" : "s"}.
           </p>
         </div>
-        <NewClientDialog
-          businessId={businessId}
-          onCreated={(client) =>
-            setClients((prev) => [...prev, client].sort((a, b) => a.nome.localeCompare(b.nome)))
-          }
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <SendPromotionDialog />
+          <NewClientDialog
+            businessId={businessId}
+            onCreated={(client) =>
+              setClients((prev) => [...prev, client].sort((a, b) => a.nome.localeCompare(b.nome)))
+            }
+          />
+        </div>
       </div>
 
       <div className="inline-flex rounded-lg border border-border p-0.5">

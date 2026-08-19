@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { STATUS_META } from "./appointment-card";
 import type { TimeBlock } from "@/lib/agenda/day-window";
+import { computeLanes } from "@/lib/agenda/lanes";
 import type { AgendaClient, AgendaDayItem, AgendaService } from "./types";
 
 const ROW_HEIGHT_PX = 56; // altura de 1 hora na grade
@@ -72,6 +73,33 @@ export function AgendaTimelineView({
   const ranges = dayItems.map(itemRange);
   const timelineStart = Math.min(businessStart, ...ranges.map((r) => r.inicio));
   const timelineEnd = Math.max(businessEnd, ...ranges.map((r) => r.fim));
+
+  // Colunas lado a lado só aparecem quando dois itens realmente ocupam o
+  // mesmo horário — normalmente só acontece com vários profissionais
+  // atendendo ao mesmo tempo (ver src/lib/agenda/lanes.ts). Com 1
+  // profissional (ou sem equipe), nunca há sobreposição real, e todo item
+  // cai sozinho na própria "coluna" (ocupa a largura inteira, como sempre).
+  const laneAssignments = computeLanes(
+    dayItems.map((item, index) => ({
+      id: domIdForDayItem(item),
+      inicio: ranges[index].inicio,
+      fim: ranges[index].fim,
+    })),
+  );
+
+  function laneStyle(domId: string): { left: string; width: string } {
+    const assignment = laneAssignments.get(domId);
+    const lanesTotal = assignment?.lanesTotal ?? 1;
+    if (lanesTotal <= 1) {
+      return { left: `${LABEL_OFFSET_PX}px`, width: `calc(100% - ${LABEL_OFFSET_PX}px - 4px)` };
+    }
+    const lane = assignment?.lane ?? 0;
+    const gapPx = 3;
+    return {
+      left: `calc(${LABEL_OFFSET_PX}px + (100% - ${LABEL_OFFSET_PX}px - 4px) * ${lane} / ${lanesTotal})`,
+      width: `calc((100% - ${LABEL_OFFSET_PX}px - 4px) / ${lanesTotal} - ${gapPx}px)`,
+    };
+  }
   const pxPerMin = ROW_HEIGHT_PX / 60;
   const totalHeight = (timelineEnd - timelineStart) * pxPerMin;
 
@@ -143,8 +171,8 @@ export function AgendaTimelineView({
                 key={domId}
                 type="button"
                 onClick={() => onSelectItem(domId)}
-                className="absolute right-1 overflow-hidden rounded-md border border-dashed border-border bg-muted/60 px-2 py-1 text-left text-xs text-muted-foreground"
-                style={{ left: LABEL_OFFSET_PX, top, height }}
+                className="absolute overflow-hidden rounded-md border border-dashed border-border bg-muted/60 px-2 py-1 text-left text-xs text-muted-foreground"
+                style={{ ...laneStyle(domId), top, height }}
               >
                 Bloqueado{item.block.motivo ? ` · ${item.block.motivo}` : ""}
               </button>
@@ -162,11 +190,11 @@ export function AgendaTimelineView({
               type="button"
               onClick={() => onSelectItem(domId)}
               className={cn(
-                "absolute right-1 overflow-hidden rounded-md border-l-4 px-2 py-1 text-left text-xs shadow-sm",
+                "absolute overflow-hidden rounded-md border-l-4 px-2 py-1 text-left text-xs shadow-sm",
                 status.className,
               )}
               style={{
-                left: LABEL_OFFSET_PX,
+                ...laneStyle(domId),
                 top,
                 height,
                 borderLeftColor: service?.cor ?? "#7C3AED",

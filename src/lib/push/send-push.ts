@@ -90,3 +90,26 @@ export async function sendPushToClient(
     .eq("client_id", clientId);
   await sendToSubscriptions(admin, data ?? [], payload);
 }
+
+// Broadcast pra todos os clientes de uma loja que já ativaram notificações
+// (opt-in feito na página de confirmação/meus agendamentos — ver
+// ClientPushOptIn). Usado pro profissional avisar promoção/cupom (ver
+// sendPromotionAction em app/(gated)/clientes/promotion-actions.ts). Sem
+// tabela de histórico: é um disparo direto, não uma campanha agendada.
+export async function sendPushToBusinessClients(
+  admin: SupabaseClient<Database>,
+  businessId: string,
+  payload: PushPayload,
+): Promise<{ enviados: number }> {
+  const { data: clients } = await admin.from("clients").select("id").eq("business_id", businessId);
+  const clientIds = (clients ?? []).map((c) => c.id);
+  if (clientIds.length === 0) return { enviados: 0 };
+
+  const { data: subscriptions } = await admin
+    .from("push_subscriptions")
+    .select("id, endpoint, keys")
+    .in("client_id", clientIds);
+
+  await sendToSubscriptions(admin, subscriptions ?? [], payload);
+  return { enviados: subscriptions?.length ?? 0 };
+}

@@ -4,8 +4,9 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnBusiness } from "@/lib/supabase/session";
 import { normalizarPeriodo, resolvePeriodo } from "./period";
-import { aggregateByFormaPagamento, aggregateByService, bucketByPeriod } from "./aggregate";
+import { aggregateByFormaPagamento, aggregateByProfissional, aggregateByService, bucketByPeriod } from "./aggregate";
 import { PeriodFilter } from "./period-filter";
+import { ProfessionalFilter } from "./professional-filter";
 import { ExpiringPlans } from "./expiring-plans";
 import { ExportCsvButton } from "./export-csv-button";
 import { PrintReportButton } from "./print-report-button";
@@ -22,17 +23,23 @@ const RevenueByServiceChart = dynamic(() =>
 const RevenueByPaymentMethodChart = dynamic(() =>
   import("./charts/revenue-by-payment-method-chart").then((mod) => mod.RevenueByPaymentMethodChart),
 );
+const RevenueByProfessionalChart = dynamic(() =>
+  import("./charts/revenue-by-professional-chart").then((mod) => mod.RevenueByProfessionalChart),
+);
 import { Card, CardContent } from "@/components/ui/card";
 import type { ExpiringPlan, FinancePayment } from "./types";
 
 export const metadata: Metadata = { title: "Financeiro" };
 
-// service_id do agendamento vem embutido na query de appointment_payments
-// (relação N:1 — appointment_payments.appointment_id sempre aponta pra um
-// único appointments) em vez de uma segunda ida ao banco por id. Cast
-// explícito pelo mesmo motivo do embed em app/(gated)/agenda/page.tsx: os
-// tipos do Database são mantidos à mão e não modelam relacionamentos.
-type PaymentEmbedRow = FinancePayment & { appointments: { service_id: string } | null };
+// service_id/professional_id do agendamento vêm embutidos na query de
+// appointment_payments (relação N:1 — appointment_payments.appointment_id
+// sempre aponta pra um único appointments) em vez de uma segunda ida ao
+// banco por id. Cast explícito pelo mesmo motivo do embed em
+// app/(gated)/agenda/page.tsx: os tipos do Database são mantidos à mão e não
+// modelam relacionamentos.
+type PaymentEmbedRow = FinancePayment & {
+  appointments: { service_id: string; professional_id: string | null } | null;
+};
 
 function formatarPreco(preco: number) {
   return preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -57,12 +64,12 @@ function mesAnterior(anoMes: string): string {
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string }>;
+  searchParams: Promise<{ periodo?: string; profissional?: string }>;
 }) {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
-  const { periodo: periodoParam } = await searchParams;
+  const { periodo: periodoParam, profissional: profissionalParam } = await searchParams;
   const periodo = normalizarPeriodo(periodoParam);
   const { de, ate, ateStr } = resolvePeriodo(periodo, business!.timezone);
 
@@ -79,7 +86,7 @@ export default async function FinanceiroPage({
     await Promise.all([
       supabase
         .from("appointment_payments")
-        .select("appointment_id, valor, forma_pagamento, origem, pago_em, appointments(service_id)")
+        .select("appointment_id, valor, forma_pagamento, origem, pago_em, appointments(service_id, professional_id)")
         .gte("pago_em", de.toISOString())
         .lte("pago_em", ate.toISOString()),
       supabase.from("services").select("id, nome").eq("business_id", business!.id),
@@ -107,19 +114,45 @@ export default async function FinanceiroPage({
     pago_em: p.pago_em,
   }));
   const appointmentServiceMap = new Map<string, string>();
+  const appointmentProfessionalMap = new Map<string, string>();
   for (const row of paymentEmbedRows) {
-    if (row.appointments) appointmentServiceMap.set(row.appointment_id, row.appointments.service_id);
+    if (!row.appointments) continue;
+    appointmentServiceMap.set(row.appointment_id, row.appointments.service_id);
+    if (row.appointments.professional_id) {
+      appointmentProfessionalMap.set(row.appointment_id, row.appointments.professional_id);
+    }
   }
   const servicesById = new Map((services ?? []).map((s) => [s.id, s.nome]));
 
-  const byPeriod = bucketByPeriod(paymentsTyped, de, ate, business!.timezone);
-  const byService = aggregateByService(paymentsTyped, appointmentServiceMap, servicesById);
-  const byFormaPagamento = aggregateByFormaPagamento(paymentsTyped);
+  // Vazio numa loja que não usa a aba Equipe — os cards/gráfico de
+  // profissional simplesmente não aparecem (ver renderização abaixo).
+  const { data: professionals } = await supabase
+    .from("professionals")
+    .select("id, nome")
+    .eq("business_id", business!.id);
+  const professionalsById = new Map((professionals ?? []).map((p) => [p.id, p.nome]));
+
+  // Filtro opcional por profissional (?profissional=<id>) — mesmo padrão de
+  // searchParam do PeriodFilter, afeta todos os cards/gráficos/CSV abaixo de
+  // uma vez só. Só é válido se corresponder a um profissional real da loja;
+  // um id qualquer na URL simplesmente cai pra "todos".
+  const professionalIdFiltro =
+    profissionalParam && (professionals ?? []).some((p) => p.id === profissionalParam)
+      ? profissionalParam
+      : null;
+  const paymentsFiltrados = professionalIdFiltro
+    ? paymentsTyped.filter((p) => appointmentProfessionalMap.get(p.appointment_id) === professionalIdFiltro)
+    : paymentsTyped;
+
+  const byPeriod = bucketByPeriod(paymentsFiltrados, de, ate, business!.timezone);
+  const byService = aggregateByService(paymentsFiltrados, appointmentServiceMap, servicesById);
+  const byFormaPagamento = aggregateByFormaPagamento(paymentsFiltrados);
+  const byProfissional = aggregateByProfissional(paymentsFiltrados, appointmentProfessionalMap, professionalsById);
 
   // Produtos vendidos junto de agendamentos já pagos no período (mesmo
-  // recorte de paymentsTyped) — não é um chart novo, só mais um número no
-  // resumo, pra não pesar a página com mais uma query pesada/gráfico.
-  const paymentAppointmentIds = [...new Set(paymentsTyped.map((p) => p.appointment_id))];
+  // recorte de paymentsFiltrados) — não é um chart novo, só mais um número
+  // no resumo, pra não pesar a página com mais uma query pesada/gráfico.
+  const paymentAppointmentIds = [...new Set(paymentsFiltrados.map((p) => p.appointment_id))];
   const { data: produtosVendidosRaw } =
     paymentAppointmentIds.length > 0
       ? await supabase
@@ -133,10 +166,10 @@ export default async function FinanceiroPage({
   );
   const itensProdutos = (produtosVendidosRaw ?? []).reduce((acc, p) => acc + p.quantidade, 0);
 
-  const totalAvulso = paymentsTyped
+  const totalAvulso = paymentsFiltrados
     .filter((p) => p.origem === "avulso")
     .reduce((acc, p) => acc + p.valor, 0);
-  const totalPlanoReferencia = paymentsTyped
+  const totalPlanoReferencia = paymentsFiltrados
     .filter((p) => p.origem === "plano")
     .reduce((acc, p) => acc + p.valor, 0);
 
@@ -183,13 +216,21 @@ export default async function FinanceiroPage({
             byPeriod={byPeriod}
             byService={byService}
             byFormaPagamento={byFormaPagamento}
+            byProfissional={byProfissional}
           />
           <PrintReportButton />
         </div>
       </div>
 
-      <div className="print:hidden">
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
         <PeriodFilter periodo={periodo} />
+        {professionals && professionals.length > 0 ? (
+          <ProfessionalFilter
+            periodo={periodo}
+            professionalId={professionalIdFiltro}
+            professionals={professionals}
+          />
+        ) : null}
       </div>
 
       <MonthlyRevenueCard
@@ -237,6 +278,7 @@ export default async function FinanceiroPage({
       <RevenueByPeriodChart data={byPeriod} />
       <RevenueByServiceChart data={byService} />
       <RevenueByPaymentMethodChart data={byFormaPagamento} />
+      {professionals && professionals.length > 0 ? <RevenueByProfessionalChart data={byProfissional} /> : null}
       <ExpiringPlans plans={expiringPlans} nomeLoja={business!.nome_loja} />
     </div>
   );

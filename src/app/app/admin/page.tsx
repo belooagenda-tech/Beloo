@@ -63,19 +63,54 @@ export default async function AdminPage({
   const profileIds = [...new Set((businesses ?? []).map((b) => b.profile_id))];
   const { data: profiles } =
     profileIds.length > 0
-      ? await admin.from("profiles").select("id, email").in("id", profileIds)
+      ? await admin.from("profiles").select("id, telefone, email").in("id", profileIds)
       : { data: [] };
 
   const emailById = new Map((profiles ?? []).map((p) => [p.id, p.email]));
+  const telefoneById = new Map((profiles ?? []).map((p) => [p.id, p.telefone]));
   const subByBusinessId = new Map((subscriptions ?? []).map((s) => [s.business_id, s]));
+
+  // Status de uso — decide qual mensagem de WhatsApp oferecer (ver
+  // buildOutreachMessage em src/lib/whatsapp.ts): sem nenhum serviço
+  // cadastrado, com serviço mas nunca recebeu agendamento, ou já ativo.
+  // Escopado às lojas desta página (mesmo padrão de profileIds acima).
+  const pageBusinessIds = (businesses ?? []).map((b) => b.id);
+  const { data: servicesRaw } =
+    pageBusinessIds.length > 0
+      ? await admin.from("services").select("business_id").eq("ativo", true).in("business_id", pageBusinessIds)
+      : { data: [] };
+  const businessesComServico = new Set((servicesRaw ?? []).map((s) => s.business_id));
+
+  // Existência de agendamento (não a contagem) é o que importa aqui — 1
+  // query pequena por loja (`head: true`, sem baixar linha nenhuma) em vez
+  // de uma query só com um LIMIT compartilhado entre todas as lojas da
+  // página, que arriscaria uma loja com muitos agendamentos "engolir" o
+  // limite e esconder agendamentos de outra loja da mesma página.
+  const contagens = await Promise.all(
+    pageBusinessIds.map((id) =>
+      admin.from("appointments").select("id", { count: "exact", head: true }).eq("business_id", id),
+    ),
+  );
+  const businessesComAgendamento = new Set(
+    pageBusinessIds.filter((_, index) => (contagens[index].count ?? 0) > 0),
+  );
 
   const linhas = (businesses ?? []).map((business) => {
     const sub = subByBusinessId.get(business.id);
+    const statusUso: "sem_configuracao" | "configurado_sem_uso" | "ativo" = businessesComAgendamento.has(
+      business.id,
+    )
+      ? "ativo"
+      : businessesComServico.has(business.id)
+        ? "configurado_sem_uso"
+        : "sem_configuracao";
     return {
       id: business.id,
       nomeLoja: business.nome_loja,
       slug: business.slug,
       email: emailById.get(business.profile_id) ?? "—",
+      telefone: telefoneById.get(business.profile_id) ?? null,
+      statusUso,
       status: sub?.status ?? "trial",
       trialEndsAt: sub?.trial_ends_at ?? null,
       currentPeriodEnd: sub?.current_period_end ?? null,
@@ -162,6 +197,11 @@ export default async function AdminPage({
     .select("id", { count: "exact", head: true })
     .eq("resolved", false);
 
+  const { count: mensagensNaoLidas } = await admin
+    .from("support_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("lida", false);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -172,6 +212,17 @@ export default async function AdminPage({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/app/admin/suporte"
+            className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          >
+            Suporte
+            {mensagensNaoLidas ? (
+              <Badge className="bg-primary/15 text-primary" variant="secondary">
+                {mensagensNaoLidas}
+              </Badge>
+            ) : null}
+          </Link>
           <Link
             href="/app/admin/anuncios"
             className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent"

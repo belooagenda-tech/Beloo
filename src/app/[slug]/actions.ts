@@ -128,6 +128,7 @@ export async function subscribeClientPushByPhoneAction(
 export async function getAvailableSlotsAction(
   slug: string,
   serviceId: string,
+  professionalId?: string,
 ): Promise<Record<string, string[]>> {
   const supabase = createAdminClient();
   const { data: business } = await supabase
@@ -138,7 +139,7 @@ export async function getAvailableSlotsAction(
 
   if (!business) return {};
 
-  const slots = await getAvailableSlotsForService(business.id, serviceId);
+  const slots = await getAvailableSlotsForService(business.id, serviceId, professionalId ?? null);
   return slots ?? {};
 }
 
@@ -159,6 +160,10 @@ export async function createAppointmentAction(input: {
   // momento da gravação, então um id adulterado só é ignorado, nunca
   // aceito com um preço diferente do cadastrado.
   produtos?: { productId: string; quantidade: number }[];
+  // Vem preenchido quando o cliente escolheu um profissional na vitrine
+  // (modo "cliente_escolhe"); undefined no modo automático ou "sem
+  // preferência" — nesse caso a RPC escolhe quem atende.
+  professionalId?: string;
 }): Promise<CreateAppointmentResult> {
   // Campo-armadilha preenchido = formulário automatizado. Devolve o mesmo
   // erro genérico de sempre, sem revelar que foi detectado como bot.
@@ -195,7 +200,7 @@ export async function createAppointmentAction(input: {
     return { ok: false, error: "Esse serviço não está mais disponível." };
   }
 
-  const slots = await getAvailableSlotsForService(business.id, service.id);
+  const slots = await getAvailableSlotsForService(business.id, service.id, input.professionalId ?? null);
   const disponivel = Object.values(slots ?? {}).some((horarios) =>
     horarios.includes(input.inicioISO),
   );
@@ -246,6 +251,7 @@ export async function createAppointmentAction(input: {
     p_produtos: (input.produtos ?? [])
       .filter((p) => p.quantidade > 0)
       .map((p) => ({ product_id: p.productId, quantidade: p.quantidade })),
+    p_professional_id: input.professionalId ?? null,
   });
 
   if (rpcError || !rpcResult) {
@@ -261,6 +267,9 @@ export async function createAppointmentAction(input: {
     }
     if (rpcError?.code === "BL002") {
       return { ok: false, error: "Esse serviço não está mais disponível." };
+    }
+    if (rpcError?.code === "BL009") {
+      return { ok: false, error: "Esse horário acabou de ficar indisponível. Escolha outro horário ou profissional." };
     }
     return { ok: false, error: "Não foi possível concluir o agendamento. Tente novamente." };
   }
@@ -330,6 +339,9 @@ export async function joinWaitlistAction(input: {
   nome: string;
   telefone: string;
   serviceId?: string;
+  // Profissional que o cliente pediu (opcional) — só faz sentido quando o
+  // serviço tem equipe vinculada; ver ProfessionalPicker no fluxo público.
+  professionalId?: string;
   observacao?: string;
 }): Promise<JoinWaitlistResult> {
   const dentroDoLimite = await checkRateLimit("public_join_waitlist", {
@@ -358,6 +370,7 @@ export async function joinWaitlistAction(input: {
     nome: parsed.data.nome,
     telefone: normalizePhone(parsed.data.telefone),
     service_id: input.serviceId || null,
+    professional_id: input.professionalId || null,
     observacao: input.observacao?.trim() || null,
   });
   if (error) {

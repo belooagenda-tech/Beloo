@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { cache } from "react";
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicBookingFlow } from "./public-booking-flow";
+import { getPublicBusiness } from "./data";
 
 // Dados de negócio/serviços/planos mudam pouco e essa é a página pública
 // mais visitada do produto — cachear por 30s tira carga do Supabase sem
@@ -11,45 +10,6 @@ import { PublicBookingFlow } from "./public-booking-flow";
 // buscada à parte, via Server Action, no client (ver public-booking-flow.tsx
 // / getAvailableSlotsAction), não fica presa a este cache.
 export const revalidate = 30;
-
-const getPublicBusiness = cache(async (slug: string) => {
-  const supabase = createAdminClient();
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, nome_loja, slug, categoria, logo_url, timezone, entrada_ativa, entrada_percentual")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (!business) return null;
-
-  // As três consultas abaixo são independentes entre si — rodar em paralelo
-  // em vez de uma atrás da outra corta o tempo de resposta sem tirar nada do
-  // cache de 30s já existente (achado do mesmo tipo do batching já usado em
-  // app/(gated)/agenda/page.tsx).
-  const [{ data: services }, { data: plans }, { data: products }] = await Promise.all([
-    supabase
-      .from("services")
-      .select("id, nome, duracao_min, preco")
-      .eq("business_id", business.id)
-      .eq("ativo", true)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("client_plans")
-      .select("id, nome, valor_mensal, ciclo_dias, servicos_inclusos, permite_pagamento_online")
-      .eq("business_id", business.id)
-      .eq("ativo", true)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("products")
-      .select("id, nome, descricao, preco, imagem_url")
-      .eq("business_id", business.id)
-      .eq("ativo", true)
-      .order("ordem", { ascending: true })
-      .order("created_at", { ascending: true }),
-  ]);
-
-  return { business, services: services ?? [], plans: plans ?? [], products: products ?? [] };
-});
 
 export async function generateMetadata({
   params,
@@ -87,6 +47,8 @@ export default async function PublicBookingPage({
       services={data.services}
       plans={data.plans}
       products={data.products}
+      professionals={data.professionals}
+      professionalServices={data.professionalServices}
     />
   );
 }

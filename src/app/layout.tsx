@@ -34,6 +34,14 @@ export const metadata: Metadata = {
   icons: {
     apple: "/icons/apple-touch-icon.png",
   },
+  // iOS Safari não lê o `display: standalone` do manifest.json pra decidir
+  // se abre em tela cheia — precisa dessas meta tags específicas (que o
+  // Next injeta a partir daqui) além do link de apple-touch-icon acima.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Beloo",
+  },
   openGraph: {
     title: TITLE_PADRAO,
     description: DESCRICAO_PADRAO,
