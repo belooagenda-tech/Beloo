@@ -16,6 +16,7 @@ import { WhatsAppTemplateCard } from "./whatsapp-template-card";
 import { PushNotificationsCard } from "./push-notifications-card";
 import { ChangePasswordCard } from "./change-password-card";
 import { MercadoPagoCard } from "./mercadopago-card";
+import { GoogleCalendarCard } from "./google-calendar-card";
 import { DangerZoneCard } from "./danger-zone-card";
 
 export const metadata: Metadata = { title: "Configurações" };
@@ -24,11 +25,14 @@ export default async function ConfiguracoesPage() {
   const [user, business] = await Promise.all([getAuthedUser(), getOwnBusiness()]);
 
   const admin = createAdminClient();
-  const { data: mpConnection } = await admin
-    .from("mp_connections")
-    .select("mp_email")
-    .eq("business_id", business!.id)
-    .maybeSingle();
+  const [{ data: mpConnection }, { data: googleConnection }] = await Promise.all([
+    admin.from("mp_connections").select("mp_email").eq("business_id", business!.id).maybeSingle(),
+    admin
+      .from("google_calendar_connections")
+      .select("google_email, export_enabled")
+      .eq("business_id", business!.id)
+      .maybeSingle(),
+  ]);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const publicUrl = `${siteUrl}/${business!.slug}`;
@@ -89,6 +93,14 @@ export default async function ConfiguracoesPage() {
           mpEmail={mpConnection?.mp_email ?? null}
           initialEntradaAtiva={business!.entrada_ativa}
           initialEntradaPercentual={business!.entrada_percentual}
+        />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <GoogleCalendarCard
+          connected={Boolean(googleConnection)}
+          googleEmail={googleConnection?.google_email ?? null}
+          initialExportEnabled={googleConnection?.export_enabled ?? true}
         />
       </Suspense>
 

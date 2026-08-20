@@ -10,6 +10,7 @@ import { notifyProfessional } from "@/lib/push/notify";
 import { ENTRADA_EXPIRACAO_MINUTOS } from "@/lib/constants";
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { createPreference, refundPayment } from "@/lib/mercadopago/client";
+import { pushAppointmentToGoogle } from "@/lib/google-calendar/sync";
 import { checkRateLimit, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
 import type { AppointmentStatus } from "@/lib/supabase/types";
@@ -275,6 +276,12 @@ export async function createAppointmentAction(input: {
   }
 
   const appointmentId = rpcResult.appointment_id;
+
+  // Best-effort — se a loja tem o Google Calendar conectado e o
+  // agendamento não está esperando pagamento de entrada, já cria o evento
+  // na hora. Nunca lança (ver pushAppointmentToGoogle), então não atrasa
+  // nem arrisca a resposta pro cliente.
+  await pushAppointmentToGoogle(supabase, rpcResult.business_id, appointmentId);
 
   if (cobrarEntrada && entradaAccessToken && entradaValor) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
@@ -549,6 +556,8 @@ export async function rescheduleAppointmentAction(
     rpcResult.business_timezone,
     "dd/MM 'às' HH:mm",
   );
+
+  await pushAppointmentToGoogle(supabase, rpcResult.business_id, rpcResult.appointment_id);
 
   try {
     await notifyProfessional(supabase, {
@@ -874,6 +883,8 @@ export async function cancelAppointmentAction(
       avisoReembolso = " O reembolso automático da entrada falhou — verifique manualmente no Mercado Pago.";
     }
   }
+
+  await pushAppointmentToGoogle(supabase, rpcResult.business_id, rpcResult.appointment_id);
 
   const horario = formatInTimeZone(new Date(rpcResult.inicio), rpcResult.business_timezone, "dd/MM 'às' HH:mm");
 

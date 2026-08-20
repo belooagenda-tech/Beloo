@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pushAppointmentToGoogle } from "@/lib/google-calendar/sync";
 import { notifyProfessional } from "@/lib/push/notify";
 import { logError } from "@/lib/logger";
 
@@ -29,6 +30,7 @@ export async function runExpireEntradas(admin: ReturnType<typeof createAdminClie
     .select("id, business_id, client_id, service_id");
 
   for (const appointment of expirados ?? []) {
+    await pushAppointmentToGoogle(admin, appointment.business_id, appointment.id);
     try {
       const [{ data: business }, { data: client }, { data: service }] = await Promise.all([
         admin.from("businesses").select("profile_id").eq("id", appointment.business_id).maybeSingle(),

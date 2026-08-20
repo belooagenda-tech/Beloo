@@ -119,6 +119,26 @@ export type MpConnection = {
   updated_at: string;
 };
 
+export type GoogleCalendarConnection = {
+  business_id: string;
+  google_email: string | null;
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string | null;
+  calendar_id: string;
+  export_enabled: boolean;
+  connected_at: string;
+  updated_at: string;
+};
+
+export type GoogleCalendarImport = {
+  id: string;
+  business_id: string;
+  google_event_id: string;
+  agenda_block_id: string | null;
+  imported_at: string;
+};
+
 export type BusinessHour = {
   id: string;
   business_id: string;
@@ -228,6 +248,11 @@ export type Appointment = {
   entrada_expira_em: string | null;
   mp_payment_id: string | null;
   mp_preference_id: string | null;
+  // Id do evento espelhado na agenda do Google (quando a loja tem
+  // google_calendar_connections com export_enabled) — null enquanto não
+  // sincronizado, ou se a loja nunca conectou o Google Calendar.
+  google_event_id: string | null;
+  google_synced_at: string | null;
 };
 
 export type NotificationTipo =
@@ -279,6 +304,10 @@ export type AgendaBlock = {
   fim: string;
   motivo: string | null;
   created_at: string;
+  // Preenchido quando esse bloqueio veio de um evento importado do Google
+  // Calendar (ver GoogleCalendarImport) — null nos bloqueios criados
+  // manualmente na Agenda.
+  google_event_id: string | null;
 };
 
 export type RecurringBlock = {
@@ -522,6 +551,8 @@ export type Database = {
       professional_hours: Table<ProfessionalHour>;
       professional_exceptions: Table<ProfessionalException>;
       mp_connections: Table<MpConnection>;
+      google_calendar_connections: Table<GoogleCalendarConnection>;
+      google_calendar_imports: Table<GoogleCalendarImport>;
       push_subscriptions: Table<PushSubscriptionRow>;
       saas_plans: Table<SaasPlan>;
       saas_subscriptions: Table<SaasSubscription>;

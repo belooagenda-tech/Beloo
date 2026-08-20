@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSignature } from "@/lib/mercadopago/webhook-signature";
 import { getPayment, getPreapproval, platformAccessToken, refundPayment } from "@/lib/mercadopago/client";
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
+import { pushAppointmentToGoogle } from "@/lib/google-calendar/sync";
 import { notifyProfessional } from "@/lib/push/notify";
 import { logError } from "@/lib/logger";
 import { getMetaUserDataForBusiness, sendCancelSubscriptionEvent, sendSubscribeEvent } from "@/lib/meta-ads/capi";
@@ -57,6 +58,11 @@ async function handleAppointmentDeposit(admin: Admin, appointmentId: string, dat
       .update({ status: "agendado", entrada_status: "pago", mp_payment_id: payment.id })
       .eq("id", appointment.id);
 
+    // Só agora o horário está de fato confirmado — antes disso
+    // pushAppointmentToGoogle não cria evento nenhum (status
+    // "aguardando_pagamento", ver sync.ts).
+    await pushAppointmentToGoogle(admin, appointment.business_id, appointment.id);
+
     // Registra a entrada já em appointment_payments — a Agenda e a aba
     // Financeiro passam a contar esse dinheiro assim que ele realmente entra,
     // em vez de só quando o profissional "concluir e receber" o atendimento
@@ -98,6 +104,7 @@ async function handleAppointmentDeposit(admin: Admin, appointmentId: string, dat
       .from("appointments")
       .update({ status: "cancelado", entrada_status: "expirado", mp_payment_id: payment.id })
       .eq("id", appointment.id);
+    await pushAppointmentToGoogle(admin, appointment.business_id, appointment.id);
   }
   // outros status (pending, in_process) — não faz nada, espera a próxima notificação.
 

@@ -48,5 +48,8 @@ jobs:
           MERCADO_PAGO_WEBHOOK_SECRET: ci-placeholder
           MERCADO_PAGO_PLATFORM_ACCESS_TOKEN: ci-placeholder
           MP_TOKEN_ENCRYPTION_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+          GOOGLE_CLIENT_ID: ci-placeholder
+          GOOGLE_CLIENT_SECRET: ci-placeholder
+          GOOGLE_CALENDAR_STATE_SECRET: ci-placeholder
           STRIPE_SECRET_KEY: sk_test_ci-placeholder
           STRIPE_WEBHOOK_SECRET: whsec_ci-placeholder

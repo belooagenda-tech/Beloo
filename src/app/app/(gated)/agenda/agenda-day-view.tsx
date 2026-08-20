@@ -20,6 +20,7 @@ import { NewAppointmentDialog } from "./new-appointment-dialog";
 import { BlockTimeDialog } from "./block-time-dialog";
 import { CancelAppointmentDialog } from "./cancel-appointment-dialog";
 import { cancelAppointmentFromAgendaAction } from "./actions";
+import { syncAppointmentToGoogleCalendarAction } from "./google-calendar-sync-action";
 import type {
   AgendaAppointment,
   AgendaBlock,
@@ -135,6 +136,7 @@ export function AgendaDayView({
     }
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     toast.success("Agendamento atualizado.");
+    void syncAppointmentToGoogleCalendarAction(id);
   }
 
   async function handleAssignProfessional(id: string, professionalId: string) {
@@ -153,6 +155,7 @@ export function AgendaDayView({
     }
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, professional_id: professionalId } : a)));
     toast.success("Profissional atribuído.");
+    void syncAppointmentToGoogleCalendarAction(id);
   }
 
   async function handleConfirmCancel(motivo: string) {

@@ -9,6 +9,7 @@ import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPhoneBR, normalizePhone } from "@/lib/phone";
 import { manualAppointmentSchema, type ManualAppointmentInput } from "@/lib/validations/appointment";
+import { syncAppointmentToGoogleCalendarAction } from "./google-calendar-sync-action";
 import { ClientPicker } from "@/components/client-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,6 +155,10 @@ function NewAppointmentForm({
 
     onCreated(appointment, client);
     onOpenChange(false);
+    // Best-effort: espelha no Google Calendar se a loja tiver conectado.
+    // Nunca aguardado — não faz sentido segurar o fechamento do diálogo por
+    // causa de uma chamada à API do Google.
+    void syncAppointmentToGoogleCalendarAction(appointment.id);
   }
 
   return (

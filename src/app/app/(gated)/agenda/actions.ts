@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getValidAccessToken } from "@/lib/mercadopago/connection";
 import { createPreference, refundPayment } from "@/lib/mercadopago/client";
+import { pushAppointmentToGoogle } from "@/lib/google-calendar/sync";
 import { logError } from "@/lib/logger";
 
 export type CancelFromAgendaResult =
@@ -60,6 +61,8 @@ export async function cancelAppointmentFromAgendaAction(
   if (updateError) {
     return { ok: false, error: "Não foi possível cancelar. Tente novamente." };
   }
+
+  await pushAppointmentToGoogle(admin, business.id, appointmentId);
 
   let avisoReembolso: string | undefined;
   let pagamentoRemovido = false;
