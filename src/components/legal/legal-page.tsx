@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/brand/logo";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function LegalPage({
   title,
@@ -29,15 +28,6 @@ export function LegalPage({
               Última atualização: {atualizadoEm}
             </p>
           </div>
-
-          <Alert>
-            <AlertDescription>
-              Este é um modelo padrão, gerado automaticamente a partir do que
-              a Beloo realmente coleta e faz com os dados. Ele não substitui
-              a revisão de um advogado antes de valer como documento
-              jurídico oficial da sua operação.
-            </AlertDescription>
-          </Alert>
 
           <div className="space-y-6 text-sm leading-relaxed text-foreground [&_h2]:mt-8 [&_h2]:font-heading [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-foreground [&_p]:text-muted-foreground [&_li]:text-muted-foreground [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
             {children}

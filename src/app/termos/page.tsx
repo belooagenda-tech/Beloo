@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "Termos de Uso" };
 
 export default function TermosPage() {
   return (
-    <LegalPage title="Termos de Uso" atualizadoEm="03 de agosto de 2026">
+    <LegalPage title="Termos de Uso" atualizadoEm="20 de agosto de 2026">
       <section>
         <p>
           Estes termos regem o uso da Beloo, uma ferramenta de agenda online
@@ -40,7 +40,28 @@ export default function TermosPage() {
             Você não pode usar um link de loja (slug) que viole marcas de
             terceiros ou tente se passar por outra pessoa ou empresa.
           </li>
+          <li>
+            Membros de equipe cadastrados por você na aba Equipe não têm
+            login nem acesso próprio à plataforma — é sua responsabilidade
+            informá-los de que os dados deles (nome, foto) estão cadastrados
+            na Beloo.
+          </li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Integração com o Google Calendar</h2>
+        <p>
+          Ao conectar sua conta do Google em Configurações, você autoriza a
+          Beloo a criar, atualizar e apagar eventos na sua agenda do Google
+          referentes aos seus agendamentos, e a importar, um por um e só
+          quando você escolher, eventos existentes na sua agenda do Google
+          como horários bloqueados. Você é responsável pelo que escolhe
+          importar; a Beloo não se responsabiliza por conflitos, duplicações
+          ou dados de terceiros que já estejam na sua agenda do Google antes
+          de conectar. Você pode desconectar a qualquer momento em
+          Configurações, sem perder nenhum agendamento já feito na Beloo.
+        </p>
       </section>
 
       <section>
@@ -60,6 +81,20 @@ export default function TermosPage() {
           pelo profissional (dinheiro, Pix, débito, crédito) — ela não
           processa nem intermedeia a movimentação financeira desses
           registros, que servem apenas para o seu controle interno.
+        </p>
+      </section>
+
+      <section>
+        <h2>Programa de indicação (divulgador)</h2>
+        <p>
+          Quem se cadastra como divulgador recebe um link de afiliado e
+          passa a ganhar uma comissão sobre as assinaturas pagas por
+          profissionais indicados por esse link. O pagamento das comissões é
+          feito via Stripe Connect, exigindo que o divulgador complete o
+          cadastro na Stripe. O percentual de comissão, as condições de
+          pagamento e a permanência no programa podem ser ajustados pela
+          Beloo a qualquer momento, sem efeito retroativo sobre comissões já
+          calculadas.
         </p>
       </section>
 
