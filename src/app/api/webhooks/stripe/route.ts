@@ -74,6 +74,62 @@ async function handleCheckoutSessionCompleted(admin: Admin, session: Stripe.Chec
   return NextResponse.json({ ok: true });
 }
 
+// Acha o business_id dono de uma assinatura Stripe. Fonte principal é
+// assinaturas_stripe (gravada por handleCheckoutSessionCompleted); fallback
+// é subscription_details.metadata.business_id, uma cópia imutável dos
+// metadados da subscription no momento em que a invoice foi finalizada (ver
+// createSaasCheckoutSession — grava business_id em subscription_data.metadata).
+//
+// O fallback existe porque checkout.session.completed e
+// invoice.payment_succeeded chegam como dois webhooks separados, quase
+// simultâneos, sem ordem garantida — em produção já aconteceu de
+// invoice.payment_succeeded chegar (e ser processado) ANTES de
+// checkout.session.completed criar a linha em assinaturas_stripe. Sem esse
+// fallback, o handler original tratava "linha ainda não existe" como
+// "não é assinatura da Beloo, ignora" — devolvia 200 (sem erro, sem log, sem
+// retry do Stripe) e a assinatura ficava presa em "trial" para sempre, com
+// o pagamento já aprovado na Stripe.
+async function resolveBusinessIdForInvoice(
+  admin: Admin,
+  invoice: Stripe.Invoice,
+  subscriptionId: string,
+): Promise<{ businessId: string; divulgadorId: string | null } | null> {
+  const { data: assinatura } = await admin
+    .from("assinaturas_stripe")
+    .select("profissional_id, divulgador_id")
+    .eq("stripe_subscription_id", subscriptionId)
+    .maybeSingle();
+  if (assinatura) {
+    return { businessId: assinatura.profissional_id, divulgadorId: assinatura.divulgador_id };
+  }
+
+  const businessId = invoice.parent?.subscription_details?.metadata?.business_id;
+  if (!businessId) return null;
+
+  // Linha ainda não existia (a corrida descrita acima) — recria agora com o
+  // que dá pra saber neste momento, pro resto do fluxo (e as próximas
+  // invoices) achar a assinatura normalmente. divulgador_id vem de
+  // `indicacoes`, mesma fonte que handleCheckoutSessionCompleted usa.
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+  const { data: indicacao } = await admin
+    .from("indicacoes")
+    .select("divulgador_id")
+    .eq("profissional_id", businessId)
+    .maybeSingle();
+
+  await admin.from("assinaturas_stripe").upsert(
+    {
+      profissional_id: businessId,
+      stripe_customer_id: customerId ?? "",
+      stripe_subscription_id: subscriptionId,
+      divulgador_id: indicacao?.divulgador_id ?? null,
+    },
+    { onConflict: "profissional_id" },
+  );
+
+  return { businessId, divulgadorId: indicacao?.divulgador_id ?? null };
+}
+
 // ============================================================================
 // invoice.payment_succeeded — cada cobrança mensal aprovada. Atualiza o
 // status de acesso (saas_subscriptions, mesma tabela/campos que o Mercado
@@ -85,13 +141,19 @@ async function handleInvoicePaymentSucceeded(admin: Admin, invoice: Stripe.Invoi
   const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
   if (!subscriptionId) return NextResponse.json({ ok: true });
 
-  const { data: assinatura } = await admin
-    .from("assinaturas_stripe")
-    .select("profissional_id, divulgador_id")
-    .eq("stripe_subscription_id", subscriptionId)
-    .maybeSingle();
-  // Não é uma assinatura da Beloo controlada por essa tabela — ignora.
-  if (!assinatura) return NextResponse.json({ ok: true });
+  const resolved = await resolveBusinessIdForInvoice(admin, invoice, subscriptionId);
+  if (!resolved) {
+    // Nem a linha existe nem a subscription carrega business_id nos
+    // metadados — algo fora do fluxo normal (ex.: assinatura Stripe criada
+    // manualmente no dashboard). Loga pra investigar; não é um erro
+    // transitório que valha a pena o Stripe reentregar.
+    logError("stripe_webhook.invoice_succeeded.sem_business_id", new Error("business_id não encontrado"), {
+      invoiceId: invoice.id,
+      subscriptionId,
+    });
+    return NextResponse.json({ ok: true });
+  }
+  const { businessId, divulgadorId } = resolved;
 
   const subscription = await stripe().subscriptions.retrieve(subscriptionId);
   const currentPeriodEnd = subscription.items.data[0]?.current_period_end;
@@ -104,7 +166,7 @@ async function handleInvoicePaymentSucceeded(admin: Admin, invoice: Stripe.Invoi
   const { data: activation } = await admin
     .from("saas_subscriptions")
     .update({ status: "ativo" })
-    .eq("business_id", assinatura.profissional_id)
+    .eq("business_id", businessId)
     .eq("status", "trial")
     .select("id");
   const isFirstActivation = (activation?.length ?? 0) > 0;
@@ -117,27 +179,27 @@ async function handleInvoicePaymentSucceeded(admin: Admin, invoice: Stripe.Invoi
         ? new Date(currentPeriodEnd * 1000).toISOString()
         : undefined,
     })
-    .eq("business_id", assinatura.profissional_id);
+    .eq("business_id", businessId);
 
   // Além de "era trial", só conta como assinatura paga de verdade se a
   // fatura realmente cobrou algo — algumas configurações de trial no Stripe
   // emitem uma invoice.payment_succeeded de R$0 na entrada do trial, e essa
   // não pode contar como conversão "Subscribe" pro Meta.
   if (isFirstActivation && invoice.amount_paid > 0) {
-    const userData = await getMetaUserDataForBusiness(admin, assinatura.profissional_id);
+    const userData = await getMetaUserDataForBusiness(admin, businessId);
     await sendSubscribeEvent({
-      businessId: assinatura.profissional_id,
+      businessId,
       eventId: randomUUID(),
       value: invoice.amount_paid / 100,
       userData,
     });
   }
 
-  if (assinatura.divulgador_id) {
+  if (divulgadorId) {
     const { data: divulgador } = await admin
       .from("divulgadores")
       .select("percentual_comissao")
-      .eq("id", assinatura.divulgador_id)
+      .eq("id", divulgadorId)
       .maybeSingle();
 
     // A Invoice (recurso lido via webhook) não expõe application_fee_amount
@@ -153,8 +215,8 @@ async function handleInvoicePaymentSucceeded(admin: Admin, invoice: Stripe.Invoi
     // reentrega do webhook nunca duplica a comissão.
     await admin.from("comissoes_registro").upsert(
       {
-        divulgador_id: assinatura.divulgador_id,
-        profissional_id: assinatura.profissional_id,
+        divulgador_id: divulgadorId,
+        profissional_id: businessId,
         stripe_invoice_id: invoice.id!,
         valor_assinatura: valorAssinatura,
         percentual_aplicado: percentual,
@@ -178,17 +240,15 @@ async function handleInvoicePaymentFailed(admin: Admin, invoice: Stripe.Invoice)
   const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
   if (!subscriptionId) return NextResponse.json({ ok: true });
 
-  const { data: assinatura } = await admin
-    .from("assinaturas_stripe")
-    .select("profissional_id")
-    .eq("stripe_subscription_id", subscriptionId)
-    .maybeSingle();
-  if (!assinatura) return NextResponse.json({ ok: true });
+  // Mesmo fallback de handleInvoicePaymentSucceeded — evita a mesma corrida
+  // com checkout.session.completed (ver resolveBusinessIdForInvoice).
+  const resolved = await resolveBusinessIdForInvoice(admin, invoice, subscriptionId);
+  if (!resolved) return NextResponse.json({ ok: true });
 
   await admin
     .from("saas_subscriptions")
     .update({ status: "atrasado" })
-    .eq("business_id", assinatura.profissional_id);
+    .eq("business_id", resolved.businessId);
 
   return NextResponse.json({ ok: true });
 }
@@ -246,18 +306,30 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  switch (event.type) {
-    case "account.updated":
-      return handleAccountUpdated(admin, event.data.object);
-    case "checkout.session.completed":
-      return handleCheckoutSessionCompleted(admin, event.data.object);
-    case "invoice.payment_succeeded":
-      return handleInvoicePaymentSucceeded(admin, event.data.object);
-    case "invoice.payment_failed":
-      return handleInvoicePaymentFailed(admin, event.data.object);
-    case "customer.subscription.deleted":
-      return handleSubscriptionDeleted(admin, event.data.object);
-    default:
-      return NextResponse.json({ ok: true });
+  // Qualquer exceção não tratada nos handlers abaixo (falha de rede com a
+  // Stripe, erro inesperado de banco etc.) precisa: (1) ficar registrada em
+  // error_logs — antes desta captura, um erro assim desaparecia sem deixar
+  // rastro em nenhum lugar visível no admin; e (2) devolver 5xx, pro Stripe
+  // reentregar o webhook automaticamente em vez de dar como entregue.
+  try {
+    switch (event.type) {
+      case "account.updated":
+        return await handleAccountUpdated(admin, event.data.object);
+      case "checkout.session.completed":
+        return await handleCheckoutSessionCompleted(admin, event.data.object);
+      case "invoice.payment_succeeded":
+        return await handleInvoicePaymentSucceeded(admin, event.data.object);
+      case "invoice.payment_failed":
+        return await handleInvoicePaymentFailed(admin, event.data.object);
+      case "customer.subscription.deleted":
+        return await handleSubscriptionDeleted(admin, event.data.object);
+      default:
+        break;
+    }
+  } catch (err) {
+    logError("stripe_webhook.falha_processamento", err, { eventType: event.type, eventId: event.id });
+    return new NextResponse("Internal error", { status: 500 });
   }
+
+  return NextResponse.json({ ok: true });
 }
