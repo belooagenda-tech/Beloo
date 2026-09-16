@@ -7,7 +7,13 @@ import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Planos" };
 
-export default async function PlanosPage() {
+export default async function PlanosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ editorPreview?: string }>;
+}) {
+  const { editorPreview } = await searchParams;
+  const preview = editorPreview === "1";
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
@@ -29,7 +35,7 @@ export default async function PlanosPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-planos" position="before" />
+      <CustomBlocks pageKey="app-planos" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">Planos</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -45,7 +51,7 @@ export default async function PlanosPage() {
         initialPlans={plans ?? []}
         mpConnected={Boolean(mpConnection)}
       />
-      <CustomBlocks pageKey="app-planos" position="after" />
+      <CustomBlocks pageKey="app-planos" position="after" preview={preview} />
     </div>
   );
 }

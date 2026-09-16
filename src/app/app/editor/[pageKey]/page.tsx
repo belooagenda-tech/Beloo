@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getOwnProfile } from "@/lib/supabase/session";
-import { isPageKey, getPageInfo } from "@/lib/layout-editor/pages";
+import { isPageKey, getPageInfo, getPreviewPath } from "@/lib/layout-editor/pages";
 import { getLayoutMeta } from "@/lib/layout-editor/get-published";
 import { themeContentSchema } from "@/lib/layout-editor/theme-schema";
 import { landingContentSchema } from "@/lib/layout-editor/landing-schema";
@@ -64,6 +64,7 @@ export default async function EditorPageKeyPage({
     <BlocksEditor
       pageKey={pageKey}
       pageLabel={pageInfo.label}
+      previewPath={getPreviewPath(pageInfo)}
       isAdmin={isAdmin}
       initialDraft={draft.success ? draft.data : {}}
       initialPublished={published.success ? published.data : {}}

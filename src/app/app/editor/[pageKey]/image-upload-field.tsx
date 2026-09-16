@@ -13,10 +13,15 @@ export function ImageUploadField({
   pageKey,
   url,
   onUploaded,
+  hint,
 }: {
   pageKey: string;
   url: string | undefined;
   onUploaded: (url: string) => void;
+  // Dica de tamanho ideal (px) mostrada abaixo do botão — a mesma imagem
+  // serve pra computador e celular (o layout é responsivo, a imagem só
+  // precisa ter resolução suficiente pro maior caso, computador).
+  hint?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -59,6 +64,7 @@ export function ImageUploadField({
       >
         {uploading ? "Enviando..." : url ? "Trocar imagem" : "Escolher imagem"}
       </Button>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }

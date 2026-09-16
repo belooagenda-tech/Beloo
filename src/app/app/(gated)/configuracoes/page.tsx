@@ -22,7 +22,13 @@ import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Configurações" };
 
-export default async function ConfiguracoesPage() {
+export default async function ConfiguracoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ editorPreview?: string }>;
+}) {
+  const { editorPreview } = await searchParams;
+  const preview = editorPreview === "1";
   const [user, business] = await Promise.all([getAuthedUser(), getOwnBusiness()]);
 
   const admin = createAdminClient();
@@ -40,7 +46,7 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-configuracoes" position="before" />
+      <CustomBlocks pageKey="app-configuracoes" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Configurações
@@ -109,7 +115,7 @@ export default async function ConfiguracoesPage() {
       <ChangePasswordCard />
 
       <DangerZoneCard />
-      <CustomBlocks pageKey="app-configuracoes" position="after" />
+      <CustomBlocks pageKey="app-configuracoes" position="after" preview={preview} />
     </div>
   );
 }

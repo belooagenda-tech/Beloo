@@ -35,12 +35,13 @@ type WaitlistEmbedRow = {
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ data?: string }>;
+  searchParams: Promise<{ data?: string; editorPreview?: string }>;
 }) {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
-  const { data: dataParam } = await searchParams;
+  const { data: dataParam, editorPreview } = await searchParams;
+  const preview = editorPreview === "1";
   const hojeStr = formatInTimeZone(new Date(), business!.timezone, "yyyy-MM-dd");
   const dataSelecionada = dataParam && /^\d{4}-\d{2}-\d{2}$/.test(dataParam) ? dataParam : hojeStr;
 
@@ -192,7 +193,7 @@ export default async function AgendaPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-agenda" position="before" />
+      <CustomBlocks pageKey="app-agenda" position="before" preview={preview} />
       <WaitlistCard nomeLoja={business!.nome_loja} initialEntries={waitlistEntries} />
       <AgendaDayView
         key={dataSelecionada}
@@ -215,7 +216,7 @@ export default async function AgendaPage({
         professionals={professionals ?? []}
         professionalServices={professionalServices ?? []}
       />
-      <CustomBlocks pageKey="app-agenda" position="after" />
+      <CustomBlocks pageKey="app-agenda" position="after" preview={preview} />
     </div>
   );
 }

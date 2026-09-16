@@ -47,7 +47,26 @@ export async function ThemeStyleInjector() {
     if (radius) declarations.push(`--radius: ${radius.rem};`);
   }
 
-  if (declarations.length === 0) return null;
+  if (theme.backgroundColor) {
+    declarations.push(`--background: ${theme.backgroundColor};`);
+  }
 
-  return <style id="layout-editor-theme">{`:root { ${declarations.join(" ")} }`}</style>;
+  // Fundo (cor ou imagem) aplicado direto no <body> — cobre o app inteiro
+  // (landing, telas internas, página pública), já que todas as rotas
+  // compartilham o root layout. Imagem tem prioridade sobre cor sólida.
+  let bodyRule = "";
+  if (theme.backgroundImageUrl) {
+    const safeUrl = theme.backgroundImageUrl.replace(/["'()]/g, "");
+    bodyRule = `body { background-image: url("${safeUrl}"); background-size: cover; background-position: center; background-repeat: no-repeat; }`;
+  } else if (theme.backgroundColor) {
+    bodyRule = `body { background-color: ${theme.backgroundColor}; }`;
+  }
+
+  if (declarations.length === 0 && !bodyRule) return null;
+
+  return (
+    <style id="layout-editor-theme">
+      {`${declarations.length > 0 ? `:root { ${declarations.join(" ")} }` : ""} ${bodyRule}`}
+    </style>
+  );
 }

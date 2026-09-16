@@ -6,7 +6,13 @@ import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Serviços" };
 
-export default async function ServicosPage() {
+export default async function ServicosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ editorPreview?: string }>;
+}) {
+  const { editorPreview } = await searchParams;
+  const preview = editorPreview === "1";
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
@@ -30,7 +36,7 @@ export default async function ServicosPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-servicos" position="before" />
+      <CustomBlocks pageKey="app-servicos" position="before" preview={preview} />
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-foreground">
@@ -50,7 +56,7 @@ export default async function ServicosPage() {
         professionals={professionals ?? []}
         professionalServices={professionalServices ?? []}
       />
-      <CustomBlocks pageKey="app-servicos" position="after" />
+      <CustomBlocks pageKey="app-servicos" position="after" preview={preview} />
     </div>
   );
 }

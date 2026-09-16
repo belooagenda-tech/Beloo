@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { getPublishedBlocks } from "@/lib/layout-editor/get-published";
+import { getPublishedBlocks, getDraftBlocks } from "@/lib/layout-editor/get-published";
+import { getOwnProfile } from "@/lib/supabase/session";
 import type { PageKey } from "@/lib/layout-editor/pages";
 import type { CustomBlock } from "@/lib/layout-editor/blocks-schema";
 
@@ -8,14 +9,31 @@ import type { CustomBlock } from "@/lib/layout-editor/blocks-schema";
 // src/lib/layout-editor/blocks-schema.ts e as 13 páginas em src/app/app/**
 // que renderizam isto (before logo após a <div> de abertura, after logo
 // antes do fechamento).
+//
+// `preview`: usado só pelo iframe de preview ao vivo dentro do Editor (ver
+// blocks-editor.tsx) — mostra o rascunho em vez do publicado, mas só se
+// quem está vendo realmente tem acesso ao Editor (checado aqui de novo, não
+// confia só no query param vindo da URL).
 export async function CustomBlocks({
   pageKey,
   position,
+  preview = false,
 }: {
   pageKey: PageKey;
   position: "before" | "after";
+  preview?: boolean;
 }) {
-  const content = await getPublishedBlocks(pageKey);
+  let content;
+  if (preview) {
+    const profile = await getOwnProfile();
+    content =
+      profile?.is_admin || profile?.is_layout_editor
+        ? await getDraftBlocks(pageKey)
+        : await getPublishedBlocks(pageKey);
+  } else {
+    content = await getPublishedBlocks(pageKey);
+  }
+
   const blocks = (content.blocks ?? []).filter((b) => b.position === position);
   if (blocks.length === 0) return null;
 

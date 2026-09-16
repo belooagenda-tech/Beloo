@@ -83,6 +83,18 @@ export const EDITABLE_PAGES = [
     path: "/app/assinatura",
   },
   { key: "app-suporte", label: "Suporte", description: "Fale com a Beloo.", type: "blocks", path: "/app/suporte" },
+  {
+    key: "public-booking",
+    label: "Página Pública (Agendamento)",
+    description:
+      "A vitrine que cada profissional compartilha com os clientes dele — vale para todas ao mesmo tempo.",
+    type: "blocks",
+    path: "/[slug]",
+    // Alvo do preview ao vivo no Editor: "/demo" é a mesma tela, só com
+    // dados fictícios (não expõe agenda real de nenhum profissional) — ver
+    // src/app/demo/page.tsx.
+    previewPath: "/demo",
+  },
 ] as const;
 
 export type PageKey = (typeof EDITABLE_PAGES)[number]["key"];
@@ -94,4 +106,11 @@ export function isPageKey(value: string): value is PageKey {
 
 export function getPageInfo(pageKey: PageKey) {
   return EDITABLE_PAGES.find((p) => p.key === pageKey)!;
+}
+
+// Alvo do iframe de preview ao vivo no Editor — igual a `path` pra quase
+// toda página; "public-booking" usa "/demo" pra não expor a agenda real de
+// nenhum profissional na tela do editor (ver EDITABLE_PAGES acima).
+export function getPreviewPath(info: (typeof EDITABLE_PAGES)[number]): string {
+  return "previewPath" in info ? info.previewPath : info.path;
 }

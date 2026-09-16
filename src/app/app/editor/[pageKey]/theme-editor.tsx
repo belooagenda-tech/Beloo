@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditorToolbar } from "../toolbar";
 import { saveDraftAction, publishAction, discardDraftAction } from "../actions";
+import { ImageUploadField } from "./image-upload-field";
 import {
   THEME_FONT_OPTIONS,
   THEME_RADIUS_OPTIONS,
@@ -16,6 +17,7 @@ import {
   type ThemeRadiusValue,
 } from "@/lib/layout-editor/theme-schema";
 import { deriveThemeColors } from "@/lib/layout-editor/color";
+import { BACKGROUND_IMAGE_HINT } from "@/lib/layout-editor/image-hints";
 
 const DEFAULT_PRIMARY = "#7C3AED";
 
@@ -102,6 +104,10 @@ export function ThemeEditor({
     "--font-sans": bodyFont?.cssVar,
     "--radius": radius?.rem,
     fontFamily: "var(--font-sans)",
+    backgroundColor: form.backgroundColor || undefined,
+    backgroundImage: form.backgroundImageUrl ? `url(${JSON.stringify(form.backgroundImageUrl)})` : undefined,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
   } as CSSProperties;
 
   return (
@@ -212,6 +218,49 @@ export function ThemeEditor({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1.5 border-t border-border pt-4">
+              <Label>Plano de fundo do app</Label>
+              <p className="text-xs text-muted-foreground">
+                Cor sólida ou imagem, atrás de tudo — landing, telas internas e página pública. A
+                imagem, se escolhida, tem prioridade sobre a cor.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={form.backgroundColor || "#FAFAFA"}
+                  onChange={(e) => setForm((f) => ({ ...f, backgroundColor: e.target.value }))}
+                  className="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-transparent p-1"
+                />
+                <span className="text-sm text-muted-foreground">
+                  {form.backgroundColor || "Cor padrão do tema"}
+                </span>
+                {form.backgroundColor ? (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground underline hover:text-foreground"
+                    onClick={() => setForm((f) => ({ ...f, backgroundColor: undefined }))}
+                  >
+                    Remover cor
+                  </button>
+                ) : null}
+              </div>
+              <ImageUploadField
+                pageKey={pageKey}
+                url={form.backgroundImageUrl || undefined}
+                onUploaded={(url) => setForm((f) => ({ ...f, backgroundImageUrl: url }))}
+                hint={BACKGROUND_IMAGE_HINT}
+              />
+              {form.backgroundImageUrl ? (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                  onClick={() => setForm((f) => ({ ...f, backgroundImageUrl: undefined }))}
+                >
+                  Remover imagem de fundo
+                </button>
+              ) : null}
             </div>
           </CardContent>
         </Card>

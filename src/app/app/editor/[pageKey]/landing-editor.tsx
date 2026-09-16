@@ -11,6 +11,7 @@ import { saveDraftAction, publishAction, discardDraftAction } from "../actions";
 import { SortableList } from "./sortable-list";
 import { IconPicker } from "./icon-picker";
 import { ImageUploadField } from "./image-upload-field";
+import { IMAGE_BLOCK_HINT } from "@/lib/layout-editor/image-hints";
 import { HeroSection } from "@/components/landing/hero-section";
 import { AudienceSection, AUDIENCE_ITEM_SEED } from "@/components/landing/audience-section";
 import { HowItWorksSection, HOW_IT_WORKS_ITEM_SEED } from "@/components/landing/how-it-works-section";
@@ -442,6 +443,7 @@ export function LandingEditor({
                     pageKey={pageKey}
                     url={block.url || undefined}
                     onUploaded={(url) => onChangeItem({ ...block, url })}
+                    hint={IMAGE_BLOCK_HINT}
                   />
                   <Input
                     value={block.alt}

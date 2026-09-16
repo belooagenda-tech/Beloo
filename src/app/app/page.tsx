@@ -15,7 +15,13 @@ export const metadata: Metadata = {
   title: "Painel",
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ editorPreview?: string }>;
+}) {
+  const { editorPreview } = await searchParams;
+  const preview = editorPreview === "1";
   const supabase = await createClient();
   const [profile, business] = await Promise.all([getOwnProfile(), getOwnBusiness()]);
 
@@ -83,7 +89,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <CustomBlocks pageKey="app-painel" position="before" />
+      <CustomBlocks pageKey="app-painel" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Olá{primeiroNome ? `, ${primeiroNome}` : ""} 👋
@@ -202,7 +208,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       ) : null}
-      <CustomBlocks pageKey="app-painel" position="after" />
+      <CustomBlocks pageKey="app-painel" position="after" preview={preview} />
     </div>
   );
 }

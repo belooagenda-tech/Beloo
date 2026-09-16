@@ -65,12 +65,17 @@ function mesAnterior(anoMes: string): string {
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string; profissional?: string }>;
+  searchParams: Promise<{ periodo?: string; profissional?: string; editorPreview?: string }>;
 }) {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
-  const { periodo: periodoParam, profissional: profissionalParam } = await searchParams;
+  const {
+    periodo: periodoParam,
+    profissional: profissionalParam,
+    editorPreview,
+  } = await searchParams;
+  const preview = editorPreview === "1";
   const periodo = normalizarPeriodo(periodoParam);
   const { de, ate, ateStr } = resolvePeriodo(periodo, business!.timezone);
 
@@ -204,7 +209,7 @@ export default async function FinanceiroPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <CustomBlocks pageKey="app-financeiro" position="before" />
+      <CustomBlocks pageKey="app-financeiro" position="before" preview={preview} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-foreground">Financeiro</h1>
@@ -282,7 +287,7 @@ export default async function FinanceiroPage({
       <RevenueByPaymentMethodChart data={byFormaPagamento} />
       {professionals && professionals.length > 0 ? <RevenueByProfessionalChart data={byProfissional} /> : null}
       <ExpiringPlans plans={expiringPlans} nomeLoja={business!.nome_loja} />
-      <CustomBlocks pageKey="app-financeiro" position="after" />
+      <CustomBlocks pageKey="app-financeiro" position="after" preview={preview} />
     </div>
   );
 }

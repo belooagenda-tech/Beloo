@@ -40,6 +40,13 @@ function revalidateForPage(pageKey: PageKey) {
     revalidatePath("/", "layout");
     return;
   }
+  if (pageKey === "public-booking") {
+    // Rota dinâmica — "page" revalida todas as lojas de uma vez, não uma
+    // slug específica. "/demo" também, já que é o alvo do preview no Editor.
+    revalidatePath("/[slug]", "page");
+    revalidatePath("/demo");
+    return;
+  }
   revalidatePath(info.path);
 }
 

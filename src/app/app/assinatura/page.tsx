@@ -14,7 +14,13 @@ const WHATSAPP_URL =
   "https://wa.me/5521972652314?text=" +
   encodeURIComponent("Olá! Quero saber mais sobre os planos do Beloo.");
 
-export default async function AssinaturaPage() {
+export default async function AssinaturaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ editorPreview?: string }>;
+}) {
+  const { editorPreview } = await searchParams;
+  const preview = editorPreview === "1";
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
@@ -27,7 +33,7 @@ export default async function AssinaturaPage() {
   if (!plan?.billing_enabled || !business) {
     return (
       <div className="mx-auto max-w-md space-y-6 py-12 text-center">
-        <CustomBlocks pageKey="app-assinatura" position="before" />
+        <CustomBlocks pageKey="app-assinatura" position="before" preview={preview} />
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-10">
             <div className="flex size-12 items-center justify-center rounded-full bg-secondary">
@@ -51,7 +57,7 @@ export default async function AssinaturaPage() {
             />
           </CardContent>
         </Card>
-        <CustomBlocks pageKey="app-assinatura" position="after" />
+        <CustomBlocks pageKey="app-assinatura" position="after" preview={preview} />
       </div>
     );
   }
@@ -70,7 +76,7 @@ export default async function AssinaturaPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 py-12">
-      <CustomBlocks pageKey="app-assinatura" position="before" />
+      <CustomBlocks pageKey="app-assinatura" position="before" preview={preview} />
       {jaAssinaPeloMercadoPago ? (
         <SaasSubscriptionCard
           status={sub?.status ?? "trial"}
@@ -86,7 +92,7 @@ export default async function AssinaturaPage() {
           valorMensal={plan.valor_mensal}
         />
       )}
-      <CustomBlocks pageKey="app-assinatura" position="after" />
+      <CustomBlocks pageKey="app-assinatura" position="after" preview={preview} />
     </div>
   );
 }

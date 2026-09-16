@@ -7,7 +7,13 @@ import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Equipe" };
 
-export default async function EquipePage() {
+export default async function EquipePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ editorPreview?: string }>;
+}) {
+  const { editorPreview } = await searchParams;
+  const preview = editorPreview === "1";
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
@@ -36,7 +42,7 @@ export default async function EquipePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-equipe" position="before" />
+      <CustomBlocks pageKey="app-equipe" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">Equipe</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -53,7 +59,7 @@ export default async function EquipePage() {
         initialProfessionals={professionals ?? []}
         initialProfessionalServices={professionalServices ?? []}
       />
-      <CustomBlocks pageKey="app-equipe" position="after" />
+      <CustomBlocks pageKey="app-equipe" position="after" preview={preview} />
     </div>
   );
 }

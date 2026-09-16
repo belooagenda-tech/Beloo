@@ -25,14 +25,18 @@ export const THEME_RADIUS_OPTIONS = [
 export type ThemeRadiusValue = (typeof THEME_RADIUS_OPTIONS)[number]["value"];
 const themeRadiusValues = THEME_RADIUS_OPTIONS.map((r) => r.value) as [ThemeRadiusValue, ...ThemeRadiusValue[]];
 
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida");
+
 export const themeContentSchema = z.object({
-  primaryColor: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida")
-    .optional(),
+  primaryColor: hexColor.optional(),
   headingFont: z.enum(themeFontValues).optional(),
   bodyFont: z.enum(themeFontValues).optional(),
   radius: z.enum(themeRadiusValues).optional(),
+  // Fundo do app inteiro (landing, telas internas, página pública). Se
+  // backgroundImageUrl estiver preenchido, ele tem prioridade sobre
+  // backgroundColor — ver theme-style-injector.tsx.
+  backgroundColor: hexColor.optional(),
+  backgroundImageUrl: z.string().url().optional(),
 });
 
 export type ThemeContent = z.infer<typeof themeContentSchema>;

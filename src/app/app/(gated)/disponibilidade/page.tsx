@@ -9,7 +9,13 @@ import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Disponibilidade" };
 
-export default async function DisponibilidadePage() {
+export default async function DisponibilidadePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ editorPreview?: string }>;
+}) {
+  const { editorPreview } = await searchParams;
+  const preview = editorPreview === "1";
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
@@ -32,7 +38,7 @@ export default async function DisponibilidadePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-disponibilidade" position="before" />
+      <CustomBlocks pageKey="app-disponibilidade" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Disponibilidade
@@ -55,7 +61,7 @@ export default async function DisponibilidadePage() {
       <RecurringBlocksCard businessId={business!.id} initialBlocks={recurringBlocks ?? []} />
 
       <ExceptionsCard businessId={business!.id} initialExceptions={exceptions ?? []} />
-      <CustomBlocks pageKey="app-disponibilidade" position="after" />
+      <CustomBlocks pageKey="app-disponibilidade" position="after" preview={preview} />
     </div>
   );
 }

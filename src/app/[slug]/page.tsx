@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicBookingFlow } from "./public-booking-flow";
 import { getPublicBusiness } from "./data";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 // Dados de negócio/serviços/planos mudam pouco e essa é a página pública
 // mais visitada do produto — cachear por 30s tira carga do Supabase sem
@@ -33,22 +34,30 @@ export async function generateMetadata({
 
 export default async function PublicBookingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ editorPreview?: string }>;
 }) {
   const { slug } = await params;
-  const data = await getPublicBusiness(slug);
+  const [data, { editorPreview }] = await Promise.all([getPublicBusiness(slug), searchParams]);
 
   if (!data) notFound();
 
+  const preview = editorPreview === "1";
+
   return (
-    <PublicBookingFlow
-      business={data.business}
-      services={data.services}
-      plans={data.plans}
-      products={data.products}
-      professionals={data.professionals}
-      professionalServices={data.professionalServices}
-    />
+    <div className="space-y-4">
+      <CustomBlocks pageKey="public-booking" position="before" preview={preview} />
+      <PublicBookingFlow
+        business={data.business}
+        services={data.services}
+        plans={data.plans}
+        products={data.products}
+        professionals={data.professionals}
+        professionalServices={data.professionalServices}
+      />
+      <CustomBlocks pageKey="public-booking" position="after" preview={preview} />
+    </div>
   );
 }
