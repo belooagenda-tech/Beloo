@@ -1,17 +1,21 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
+import type { LandingContent } from "@/lib/layout-editor/landing-schema";
 
-export function LandingFooter() {
+export const FOOTER_DEFAULTS = {
+  tagline: "O jeito simples de organizar a agenda de quem trabalha com beleza.",
+};
+
+export function LandingFooter({ content }: { content?: LandingContent["footer"] }) {
   const ano = new Date().getFullYear();
+  const tagline = content?.tagline || FOOTER_DEFAULTS.tagline;
 
   return (
     <footer className="border-t border-border px-6 py-10 sm:px-10">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col items-center gap-2 sm:items-start">
           <Logo />
-          <p className="max-w-xs text-center text-sm text-muted-foreground sm:text-left">
-            O jeito simples de organizar a agenda de quem trabalha com beleza.
-          </p>
+          <p className="max-w-xs text-center text-sm text-muted-foreground sm:text-left">{tagline}</p>
         </div>
         <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
           <Link href="/entrar" className="hover:text-foreground">

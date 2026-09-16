@@ -5,9 +5,15 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getNavItems } from "./nav-items";
 
-export function AppSidebarNav({ isAdmin = false }: { isAdmin?: boolean }) {
+export function AppSidebarNav({
+  isAdmin = false,
+  isLayoutEditor = false,
+}: {
+  isAdmin?: boolean;
+  isLayoutEditor?: boolean;
+}) {
   const pathname = usePathname();
-  const items = getNavItems(isAdmin);
+  const items = getNavItems(isAdmin, isLayoutEditor);
 
   return (
     <nav

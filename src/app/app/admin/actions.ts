@@ -159,3 +159,59 @@ export async function toggleDivulgadorStatusAction(input: {
   }
   return { ok: true };
 }
+
+// ============================================================================
+// Editor Visual — quem tem acesso à aba /app/editor. Ver
+// supabase/migrations/20260916000001_layout_editor.sql e
+// src/app/app/editor/actions.ts (onde o rascunho/publicação em si vivem).
+// ============================================================================
+
+export type LayoutEditorProfile = { id: string; nome: string; email: string | null };
+
+export async function searchProfilesByEmailAction(
+  query: string,
+): Promise<{ ok: true; profiles: LayoutEditorProfile[] } | { ok: false; error: string }> {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return { ok: false, error: "Sem permissão." };
+  }
+
+  const trimmed = query.trim();
+  if (trimmed.length < 3) {
+    return { ok: false, error: "Digite pelo menos 3 letras do e-mail." };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, nome, email")
+    .ilike("email", `%${trimmed}%`)
+    .order("nome", { ascending: true })
+    .limit(10);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível buscar. Tente novamente." };
+  }
+  return { ok: true, profiles: data ?? [] };
+}
+
+export async function setLayoutEditorAction(input: {
+  profileId: string;
+  isLayoutEditor: boolean;
+}): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return { ok: false, error: "Sem permissão." };
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ is_layout_editor: input.isLayoutEditor })
+    .eq("id", input.profileId);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível salvar. Tente novamente." };
+  }
+  return { ok: true };
+}

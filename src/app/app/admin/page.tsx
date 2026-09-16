@@ -10,6 +10,7 @@ import { ProfessionalsTable } from "./professionals-table";
 import { DivulgadoresCard, type DivulgadorRow } from "./divulgadores-card";
 import { IndicacoesCard, type IndicacaoRow } from "./indicacoes-card";
 import { ComissoesCard, type ComissaoRow } from "./comissoes-card";
+import { LayoutEditorsCard } from "./layout-editors-card";
 import { normalizarPeriodo, resolvePeriodo } from "../(gated)/financeiro/period";
 
 // Fuso fixo pro filtro de período do extrato de comissões — é um relatório
@@ -202,6 +203,12 @@ export default async function AdminPage({
     .select("id", { count: "exact", head: true })
     .eq("lida", false);
 
+  const { data: layoutEditors } = await admin
+    .from("profiles")
+    .select("id, nome, email")
+    .eq("is_layout_editor", true)
+    .order("nome", { ascending: true });
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -285,6 +292,8 @@ export default async function AdminPage({
           ) : null}
         </CardContent>
       </Card>
+
+      <LayoutEditorsCard initialEditors={layoutEditors ?? []} />
 
       <DivulgadoresCard divulgadores={divulgadores} cadastroUrl={`${siteUrl}/divulgador/cadastro`} />
       <IndicacoesCard indicacoes={indicacoes} />

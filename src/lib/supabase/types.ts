@@ -30,6 +30,9 @@ export type Profile = {
   email: string | null;
   avatar_url: string | null;
   is_admin: boolean;
+  // Acesso à aba Editor (layout visual) — concedido pelo admin em /app/admin.
+  // Todo admin também edita (checado em código); nem todo editor é admin.
+  is_layout_editor: boolean;
   created_at: string;
 };
 
@@ -519,6 +522,20 @@ export type MetaAdsEventLog = {
   created_at: string;
 };
 
+// Rascunho/publicação de uma "página editável" do Editor Visual (ver
+// src/lib/layout-editor/pages.ts para as chaves válidas de page_key e o
+// formato de draft_content/published_content de cada uma).
+export type LayoutDraft = {
+  id: string;
+  page_key: string;
+  draft_content: Record<string, unknown>;
+  published_content: Record<string, unknown>;
+  updated_by: string | null;
+  updated_at: string;
+  published_by: string | null;
+  published_at: string | null;
+};
+
 type Table<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -568,6 +585,7 @@ export type Database = {
       support_messages: Table<SupportMessage>;
       meta_ads_settings: Table<MetaAdsSettings>;
       meta_ads_events_log: Table<MetaAdsEventLog>;
+      layout_drafts: Table<LayoutDraft>;
     };
     Views: Record<string, never>;
     Functions: {
