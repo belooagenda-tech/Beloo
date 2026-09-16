@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { themeContentSchema, type ThemeContent } from "./theme-schema";
 import { landingContentSchema, type LandingContent } from "./landing-schema";
+import { blocksContentSchema, type BlocksContent } from "./blocks-schema";
 import type { PageKey } from "./pages";
 
 // Deduplicado por request (mesmo padrão de src/lib/supabase/session.ts) —
@@ -40,6 +41,21 @@ export const getDraftTheme = cache(async (): Promise<ThemeContent> => {
 export const getDraftLanding = cache(async (): Promise<LandingContent> => {
   const row = await fetchLayoutRow("landing");
   const parsed = landingContentSchema.safeParse(row?.draft_content ?? {});
+  return parsed.success ? parsed.data : {};
+});
+
+// Genérico para as 13 telas internas (type "blocks" em pages.ts) — todas
+// usam o mesmo schema de blocos de texto/imagem, então 1 par de funções
+// serve pra qualquer page_key entre elas (parametrizado, sem duplicar).
+export const getPublishedBlocks = cache(async (pageKey: PageKey): Promise<BlocksContent> => {
+  const row = await fetchLayoutRow(pageKey);
+  const parsed = blocksContentSchema.safeParse(row?.published_content ?? {});
+  return parsed.success ? parsed.data : {};
+});
+
+export const getDraftBlocks = cache(async (pageKey: PageKey): Promise<BlocksContent> => {
+  const row = await fetchLayoutRow(pageKey);
+  const parsed = blocksContentSchema.safeParse(row?.draft_content ?? {});
   return parsed.success ? parsed.data : {};
 });
 

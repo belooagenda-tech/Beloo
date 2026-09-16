@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 import { OnboardingStepCard } from "./onboarding-step-card";
 import { PushNotificationsCard } from "../configuracoes/push-notifications-card";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Primeiros passos" };
 
@@ -50,6 +51,7 @@ export default async function PrimeirosPassosPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      <CustomBlocks pageKey="app-primeiros-passos" position="before" />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">Primeiros passos</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -142,6 +144,7 @@ export default async function PrimeirosPassosPage() {
         href="/app/agenda"
         cta="Ir para Agenda"
       />
+      <CustomBlocks pageKey="app-primeiros-passos" position="after" />
     </div>
   );
 }

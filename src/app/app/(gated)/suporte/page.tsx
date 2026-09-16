@@ -6,6 +6,7 @@ import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SupportForm } from "./support-form";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Suporte" };
 
@@ -30,6 +31,7 @@ export default async function SuportePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      <CustomBlocks pageKey="app-suporte" position="before" />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">Suporte</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -52,6 +54,7 @@ export default async function SuportePage() {
       </Card>
 
       <SupportForm initialMessages={messages ?? []} />
+      <CustomBlocks pageKey="app-suporte" position="after" />
     </div>
   );
 }

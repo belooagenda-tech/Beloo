@@ -27,6 +27,7 @@ const DESTINO_POR_TIPO: Record<Notification["tipo"], string> = {
   novo_profissional: "/app/admin",
   divulgador_recuperacao_senha: "/app/admin",
   mensagem_suporte: "/app/admin/suporte",
+  mensagem_motivacional: "/app",
 };
 
 // Algumas notificações (ex.: recuperação de senha do divulgador) trazem um

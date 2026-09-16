@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOwnBusiness } from "@/lib/supabase/session";
 import { CLIENTES_PAGE_SIZE } from "./constants";
 import { ClientsListView } from "./clients-list-view";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Clientes" };
 
@@ -18,11 +19,15 @@ export default async function ClientesPage() {
     .range(0, CLIENTES_PAGE_SIZE - 1);
 
   return (
-    <ClientsListView
-      businessId={business!.id}
-      nomeLoja={business!.nome_loja}
-      initialClients={clients ?? []}
-      totalCount={count ?? clients?.length ?? 0}
-    />
+    <div className="mx-auto max-w-2xl space-y-6">
+      <CustomBlocks pageKey="app-clientes" position="before" />
+      <ClientsListView
+        businessId={business!.id}
+        nomeLoja={business!.nome_loja}
+        initialClients={clients ?? []}
+        totalCount={count ?? clients?.length ?? 0}
+      />
+      <CustomBlocks pageKey="app-clientes" position="after" />
+    </div>
   );
 }

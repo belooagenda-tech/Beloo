@@ -8,6 +8,7 @@ import { getOwnBusiness, getOwnProfile } from "@/lib/supabase/session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -82,6 +83,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <CustomBlocks pageKey="app-painel" position="before" />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Olá{primeiroNome ? `, ${primeiroNome}` : ""} 👋
@@ -200,6 +202,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       ) : null}
+      <CustomBlocks pageKey="app-painel" position="after" />
     </div>
   );
 }

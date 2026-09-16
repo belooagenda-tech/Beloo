@@ -27,6 +27,7 @@ const RevenueByProfessionalChart = dynamic(() =>
   import("./charts/revenue-by-professional-chart").then((mod) => mod.RevenueByProfessionalChart),
 );
 import { Card, CardContent } from "@/components/ui/card";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 import type { ExpiringPlan, FinancePayment } from "./types";
 
 export const metadata: Metadata = { title: "Financeiro" };
@@ -203,6 +204,7 @@ export default async function FinanceiroPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <CustomBlocks pageKey="app-financeiro" position="before" />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-foreground">Financeiro</h1>
@@ -280,6 +282,7 @@ export default async function FinanceiroPage({
       <RevenueByPaymentMethodChart data={byFormaPagamento} />
       {professionals && professionals.length > 0 ? <RevenueByProfessionalChart data={byProfissional} /> : null}
       <ExpiringPlans plans={expiringPlans} nomeLoja={business!.nome_loja} />
+      <CustomBlocks pageKey="app-financeiro" position="after" />
     </div>
   );
 }

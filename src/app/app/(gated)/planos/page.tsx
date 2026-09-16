@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOwnBusiness } from "@/lib/supabase/session";
 import { PlansManager } from "./plans-manager";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Planos" };
 
@@ -28,6 +29,7 @@ export default async function PlanosPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      <CustomBlocks pageKey="app-planos" position="before" />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">Planos</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -43,6 +45,7 @@ export default async function PlanosPage() {
         initialPlans={plans ?? []}
         mpConnected={Boolean(mpConnection)}
       />
+      <CustomBlocks pageKey="app-planos" position="after" />
     </div>
   );
 }

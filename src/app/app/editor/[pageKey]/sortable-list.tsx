@@ -26,14 +26,19 @@ export function SortableList<T extends { id: string }>({
   renderItem,
   maxItems = 24,
   minItems = 0,
+  footer,
 }: {
   items: T[];
   onChange: (items: T[]) => void;
-  onAdd: () => void;
-  addLabel: string;
+  // Omita onAdd/addLabel quando o botão de adicionar for renderizado fora
+  // (ex. duas opções de "adicionar" diferentes, como texto vs imagem — ver
+  // blocks-editor.tsx) e passe esses botões em `footer`.
+  onAdd?: () => void;
+  addLabel?: string;
   renderItem: (item: T, onChangeItem: (next: T) => void) => ReactNode;
   maxItems?: number;
   minItems?: number;
+  footer?: ReactNode;
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -62,9 +67,12 @@ export function SortableList<T extends { id: string }>({
           ))}
         </SortableContext>
       </DndContext>
-      <Button type="button" variant="outline" size="sm" disabled={items.length >= maxItems} onClick={onAdd}>
-        {addLabel}
-      </Button>
+      {footer ??
+        (onAdd ? (
+          <Button type="button" variant="outline" size="sm" disabled={items.length >= maxItems} onClick={onAdd}>
+            {addLabel}
+          </Button>
+        ) : null)}
     </div>
   );
 }

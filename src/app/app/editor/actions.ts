@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOwnProfile } from "@/lib/supabase/session";
-import { isPageKey, type PageKey } from "@/lib/layout-editor/pages";
+import { isPageKey, getPageInfo, type PageKey } from "@/lib/layout-editor/pages";
 import { themeContentSchema } from "@/lib/layout-editor/theme-schema";
 import { landingContentSchema } from "@/lib/layout-editor/landing-schema";
+import { blocksContentSchema } from "@/lib/layout-editor/blocks-schema";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -25,17 +26,21 @@ async function requireAdmin() {
 }
 
 function schemaFor(pageKey: PageKey) {
-  return pageKey === "global-theme" ? themeContentSchema : landingContentSchema;
+  const type = getPageInfo(pageKey).type;
+  if (type === "theme") return themeContentSchema;
+  if (type === "landing") return landingContentSchema;
+  return blocksContentSchema;
 }
 
 function revalidateForPage(pageKey: PageKey) {
-  if (pageKey === "global-theme") {
+  const info = getPageInfo(pageKey);
+  if (info.type === "theme") {
     // Tema vale em toda página do app (root layout) — revalida tudo que
-    // pendura dele, não só "/".
+    // pendura dele, não só a página dessa entrada.
     revalidatePath("/", "layout");
-  } else if (pageKey === "landing") {
-    revalidatePath("/");
+    return;
   }
+  revalidatePath(info.path);
 }
 
 export async function saveDraftAction(input: {

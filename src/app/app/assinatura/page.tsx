@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SaasSubscriptionCard } from "./saas-subscription-card";
 import { StripeSubscriptionCard } from "./stripe-subscription-card";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Assinatura" };
 
@@ -25,7 +26,8 @@ export default async function AssinaturaPage() {
 
   if (!plan?.billing_enabled || !business) {
     return (
-      <div className="mx-auto max-w-md py-12 text-center">
+      <div className="mx-auto max-w-md space-y-6 py-12 text-center">
+        <CustomBlocks pageKey="app-assinatura" position="before" />
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-10">
             <div className="flex size-12 items-center justify-center rounded-full bg-secondary">
@@ -49,6 +51,7 @@ export default async function AssinaturaPage() {
             />
           </CardContent>
         </Card>
+        <CustomBlocks pageKey="app-assinatura" position="after" />
       </div>
     );
   }
@@ -66,7 +69,8 @@ export default async function AssinaturaPage() {
   const jaAssinaPeloMercadoPago = Boolean(sub?.mp_preapproval_id);
 
   return (
-    <div className="mx-auto max-w-md py-12">
+    <div className="mx-auto max-w-md space-y-6 py-12">
+      <CustomBlocks pageKey="app-assinatura" position="before" />
       {jaAssinaPeloMercadoPago ? (
         <SaasSubscriptionCard
           status={sub?.status ?? "trial"}
@@ -82,6 +86,7 @@ export default async function AssinaturaPage() {
           valorMensal={plan.valor_mensal}
         />
       )}
+      <CustomBlocks pageKey="app-assinatura" position="after" />
     </div>
   );
 }

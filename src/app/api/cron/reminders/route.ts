@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToClient } from "@/lib/push/send-push";
 import { notifyProfessional } from "@/lib/push/notify";
 import { logError } from "@/lib/logger";
+import { pickMotivationalMessage } from "@/lib/motivational-messages";
 
 export const dynamic = "force-dynamic";
 
@@ -156,6 +157,73 @@ export async function sendProfessionalDayStartReminders(admin: ReturnType<typeof
   return enviados;
 }
 
+// Toda loja tem uma linha em `businesses` por profissional (1:1 no MVP) —
+// então "por business" aqui é o mesmo que "por profissional". Envia às 07:00
+// no fuso de cada um, uma vez por dia, independente de ter algum
+// agendamento marcado (é sobre o profissional, não sobre a agenda).
+const MOTIVATIONAL_SEND_HOUR = 7;
+
+export async function sendDailyMotivationalMessages(admin: ReturnType<typeof createAdminClient>, now: Date) {
+  const { data: businesses } = await admin.from("businesses").select("id, profile_id, timezone");
+  if (!businesses || businesses.length === 0) return 0;
+
+  // Mesmo padrão de sendProfessionalDayStartReminders: 1 query só pra "já
+  // enviado nas últimas 24h" de todos os negócios, dedupe em memória.
+  const profileIds = businesses.map((b) => b.profile_id);
+  const { data: enviadosRecentes } = await admin
+    .from("notifications")
+    .select("profile_id, created_at")
+    .in("profile_id", profileIds)
+    .eq("tipo", "mensagem_motivacional")
+    .gte("created_at", addHours(now, -24).toISOString());
+
+  const enviadosPorPerfil = new Map<string, Date[]>();
+  for (const n of enviadosRecentes ?? []) {
+    const lista = enviadosPorPerfil.get(n.profile_id) ?? [];
+    lista.push(new Date(n.created_at));
+    enviadosPorPerfil.set(n.profile_id, lista);
+  }
+
+  let enviados = 0;
+
+  for (const business of businesses) {
+    const horaLocal = formatInTimeZone(now, business.timezone, "HH:mm");
+    const [horaAtual, minutoAtual] = horaLocal.split(":").map(Number);
+    // Janela de 15min alinhada à cadência do cron (*/15 * * * *) — evita
+    // depender de bater exatamente 07:00 numa execução.
+    if (horaAtual !== MOTIVATIONAL_SEND_HOUR || minutoAtual >= 15) continue;
+
+    const hojeStr = formatInTimeZone(now, business.timezone, "yyyy-MM-dd");
+    const inicioDoDia = fromZonedTime(`${hojeStr}T00:00:00`, business.timezone);
+
+    const jaEnviadoHoje = (enviadosPorPerfil.get(business.profile_id) ?? []).some(
+      (criadoEm) => criadoEm >= inicioDoDia,
+    );
+    if (jaEnviadoHoje) continue;
+
+    const dayIndex = Math.floor(inicioDoDia.getTime() / (24 * 60 * 60 * 1000));
+    const mensagem = pickMotivationalMessage(dayIndex);
+
+    try {
+      await notifyProfessional(admin, {
+        profileId: business.profile_id,
+        tipo: "mensagem_motivacional",
+        titulo: "Bom dia! 🌞",
+        corpo: mensagem,
+        url: "/app",
+      });
+    } catch (err) {
+      // Mesmo tratamento do lembrete_dia: 1 falha de push não pode travar o
+      // envio pros demais negócios neste ciclo do cron.
+      logError("cron.reminders.mensagem_motivacional", err, { businessId: business.id });
+      continue;
+    }
+    enviados++;
+  }
+
+  return enviados;
+}
+
 export async function GET(request: Request) {
   // Fail-closed: sem CRON_SECRET configurado, a rota nunca roda — evita que
   // uma env var esquecida deixe o endpoint público sem autenticação
@@ -173,10 +241,11 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   const now = new Date();
 
-  const [lembretesCliente, lembretesProfissional] = await Promise.all([
+  const [lembretesCliente, lembretesProfissional, mensagensMotivacionais] = await Promise.all([
     sendClientReminders(admin, now),
     sendProfessionalDayStartReminders(admin, now),
+    sendDailyMotivationalMessages(admin, now),
   ]);
 
-  return NextResponse.json({ ok: true, lembretesCliente, lembretesProfissional });
+  return NextResponse.json({ ok: true, lembretesCliente, lembretesProfissional, mensagensMotivacionais });
 }

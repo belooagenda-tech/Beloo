@@ -6,6 +6,7 @@ import { getOwnBusiness } from "@/lib/supabase/session";
 import { resolveDayBlocks } from "@/lib/agenda/day-window";
 import { AgendaDayView } from "./agenda-day-view";
 import { WaitlistCard, type WaitlistEntryRow } from "./waitlist-card";
+import { CustomBlocks } from "@/components/theme/custom-blocks";
 import type { AgendaAppointment, AgendaClient, AgendaPayment, AgendaProduct } from "./types";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -191,6 +192,7 @@ export default async function AgendaPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      <CustomBlocks pageKey="app-agenda" position="before" />
       <WaitlistCard nomeLoja={business!.nome_loja} initialEntries={waitlistEntries} />
       <AgendaDayView
         key={dataSelecionada}
@@ -213,6 +215,7 @@ export default async function AgendaPage({
         professionals={professionals ?? []}
         professionalServices={professionalServices ?? []}
       />
+      <CustomBlocks pageKey="app-agenda" position="after" />
     </div>
   );
 }

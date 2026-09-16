@@ -270,7 +270,8 @@ export type NotificationTipo =
   | "lista_espera"
   | "novo_profissional"
   | "divulgador_recuperacao_senha"
-  | "mensagem_suporte";
+  | "mensagem_suporte"
+  | "mensagem_motivacional";
 
 export type Notification = {
   id: string;
