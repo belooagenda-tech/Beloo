@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
+import { Lock, QrCode as QrCodeIcon } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthedUser, getOwnBusiness } from "@/lib/supabase/session";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
 import { BusinessInfoCard } from "./business-info-card";
+import { ProFeatureGate } from "@/components/plan/pro-feature-gate";
+import { hasFeature } from "@/lib/plan/features";
 
 // "qrcode" só é necessário nesta página — carregar sob demanda mantém o
 // bundle inicial do resto de /app livre desse peso (mesmo padrão já usado
@@ -18,17 +23,10 @@ import { ChangePasswordCard } from "./change-password-card";
 import { MercadoPagoCard } from "./mercadopago-card";
 import { GoogleCalendarCard } from "./google-calendar-card";
 import { DangerZoneCard } from "./danger-zone-card";
-import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Configurações" };
 
-export default async function ConfiguracoesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ editorPreview?: string }>;
-}) {
-  const { editorPreview } = await searchParams;
-  const preview = editorPreview === "1";
+export default async function ConfiguracoesPage() {
   const [user, business] = await Promise.all([getAuthedUser(), getOwnBusiness()]);
 
   const admin = createAdminClient();
@@ -46,7 +44,6 @@ export default async function ConfiguracoesPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-configuracoes" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Configurações
@@ -70,7 +67,17 @@ export default async function ConfiguracoesPage({
             </a>
           </div>
           <div className="flex items-center gap-2">
-            <QrCodeButton url={publicUrl} nomeLoja={business!.nome_loja} />
+            {hasFeature(business!.plan_tier, "qr_code") ? (
+              <QrCodeButton url={publicUrl} nomeLoja={business!.nome_loja} />
+            ) : (
+              <Link href="/app/assinatura" className="inline-flex">
+                <Button type="button" variant="outline" size="sm">
+                  <Lock className="size-3.5" />
+                  <QrCodeIcon className="size-4" />
+                  QR Code
+                </Button>
+              </Link>
+            )}
             <CopyLinkButton url={publicUrl} />
           </div>
         </CardContent>
@@ -95,14 +102,21 @@ export default async function ConfiguracoesPage({
 
       <PushNotificationsCard profileId={user!.id} />
 
-      <Suspense fallback={null}>
-        <MercadoPagoCard
-          connected={Boolean(mpConnection)}
-          mpEmail={mpConnection?.mp_email ?? null}
-          initialEntradaAtiva={business!.entrada_ativa}
-          initialEntradaPercentual={business!.entrada_percentual}
+      {hasFeature(business!.plan_tier, "pix_automatico") ? (
+        <Suspense fallback={null}>
+          <MercadoPagoCard
+            connected={Boolean(mpConnection)}
+            mpEmail={mpConnection?.mp_email ?? null}
+            initialEntradaAtiva={business!.entrada_ativa}
+            initialEntradaPercentual={business!.entrada_percentual}
+          />
+        </Suspense>
+      ) : (
+        <ProFeatureGate
+          feature="pix_automatico"
+          description="Cobre uma entrada ou o valor cheio antes do atendimento, com link gerado na hora via Mercado Pago."
         />
-      </Suspense>
+      )}
 
       <Suspense fallback={null}>
         <GoogleCalendarCard
@@ -115,7 +129,6 @@ export default async function ConfiguracoesPage({
       <ChangePasswordCard />
 
       <DangerZoneCard />
-      <CustomBlocks pageKey="app-configuracoes" position="after" preview={preview} />
     </div>
   );
 }

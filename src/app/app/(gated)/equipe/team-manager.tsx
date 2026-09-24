@@ -55,7 +55,11 @@ export function TeamManager({
     const supabase = createClient();
     const { error } = await supabase.from("professionals").update({ ativo }).eq("id", professional.id);
     if (error) {
-      toast.error("Não foi possível atualizar o profissional.");
+      toast.error(
+        error.code === "BL011"
+          ? "Múltiplos profissionais é exclusivo do plano Studio. Faça upgrade em Assinatura."
+          : "Não foi possível atualizar o profissional.",
+      );
       return;
     }
     setProfessionals((prev) => prev.map((p) => (p.id === professional.id ? { ...p, ativo } : p)));

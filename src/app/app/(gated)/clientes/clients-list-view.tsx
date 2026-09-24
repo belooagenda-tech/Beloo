@@ -13,19 +13,24 @@ import { NewClientDialog } from "./new-client-dialog";
 import { SendPromotionDialog } from "./send-promotion-dialog";
 import { InactiveClientsView } from "./inactive-clients-view";
 import { BirthdayClientsView } from "./birthday-clients-view";
+import { ProFeatureGate } from "@/components/plan/pro-feature-gate";
+import { hasFeature } from "@/lib/plan/features";
 import { CLIENTES_PAGE_SIZE } from "./constants";
 import type { ClientListItem } from "./types";
+import type { PlanTier } from "@/lib/supabase/types";
 
 export function ClientsListView({
   businessId,
   nomeLoja,
   initialClients,
   totalCount,
+  planTier,
 }: {
   businessId: string;
   nomeLoja: string;
   initialClients: ClientListItem[];
   totalCount: number;
+  planTier: PlanTier;
 }) {
   const [clients, setClients] = useState(initialClients);
   const [busca, setBusca] = useState("");
@@ -107,7 +112,14 @@ export function ClientsListView({
       </div>
 
       {aba === "inativos" ? (
-        <InactiveClientsView businessId={businessId} nomeLoja={nomeLoja} />
+        hasFeature(planTier, "reengajamento") ? (
+          <InactiveClientsView businessId={businessId} nomeLoja={nomeLoja} />
+        ) : (
+          <ProFeatureGate
+            feature="reengajamento"
+            description="Chame quem sumiu de volta com um link que já abre o WhatsApp com o texto certo."
+          />
+        )
       ) : aba === "aniversariantes" ? (
         <BirthdayClientsView businessId={businessId} />
       ) : (

@@ -6,6 +6,7 @@ import { sendPushToClient } from "@/lib/push/send-push";
 import { notifyProfessional } from "@/lib/push/notify";
 import { logError } from "@/lib/logger";
 import { pickMotivationalMessage } from "@/lib/motivational-messages";
+import { hasFeature } from "@/lib/plan/features";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export async function sendClientReminders(admin: ReturnType<typeof createAdminCl
   const serviceIds = [...new Set(upcoming.map((a) => a.service_id))];
 
   const [{ data: businesses }, { data: services }] = await Promise.all([
-    admin.from("businesses").select("id, nome_loja, timezone").in("id", businessIds),
+    admin.from("businesses").select("id, nome_loja, timezone, plan_tier").in("id", businessIds),
     admin.from("services").select("id, nome").in("id", serviceIds),
   ]);
 
@@ -56,17 +57,21 @@ export async function sendClientReminders(admin: ReturnType<typeof createAdminCl
     const service = serviceById.get(appointment.service_id);
     if (!business || !service) continue;
 
-    const horario = formatInTimeZone(new Date(appointment.inicio), business.timezone, "HH:mm");
-
-    try {
-      await sendPushToClient(admin, appointment.client_id, {
-        title: "Lembrete de agendamento",
-        body: `${service.nome} com ${business.nome_loja} hoje às ${horario}.`,
-        tag: "lembrete_cliente",
-      });
-    } catch {
-      // segue para marcar como enviado mesmo assim - não vamos tentar de novo
-      // a cada execução do cron por causa de uma falha pontual de envio.
+    // Lembrete automático pro cliente é exclusivo do Pro/Studio — negócios
+    // Grátis só marcam como "processado" (não reenvia a cada ciclo do cron),
+    // sem disparar o push.
+    if (hasFeature(business.plan_tier, "lembretes_automaticos")) {
+      const horario = formatInTimeZone(new Date(appointment.inicio), business.timezone, "HH:mm");
+      try {
+        await sendPushToClient(admin, appointment.client_id, {
+          title: "Lembrete de agendamento",
+          body: `${service.nome} com ${business.nome_loja} hoje às ${horario}.`,
+          tag: "lembrete_cliente",
+        });
+      } catch {
+        // segue para marcar como enviado mesmo assim - não vamos tentar de novo
+        // a cada execução do cron por causa de uma falha pontual de envio.
+      }
     }
 
     idsProcessados.push(appointment.id);

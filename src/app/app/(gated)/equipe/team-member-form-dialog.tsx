@@ -115,7 +115,11 @@ function TeamMemberForm({
       .single();
 
     if (error || !professional) {
-      toast.error("Não foi possível salvar o profissional. Tente novamente.");
+      toast.error(
+        error?.code === "BL011"
+          ? "Múltiplos profissionais é exclusivo do plano Studio. Faça upgrade em Assinatura."
+          : "Não foi possível salvar o profissional. Tente novamente.",
+      );
       return;
     }
 

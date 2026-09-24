@@ -2,10 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hasFeature } from "@/lib/plan/features";
+import type { PlanTier } from "@/lib/supabase/types";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
-async function getOwnBusinessId(): Promise<string | null> {
+async function getOwnBusiness(): Promise<{ id: string; plan_tier: PlanTier } | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -14,17 +16,18 @@ async function getOwnBusinessId(): Promise<string | null> {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id")
+    .select("id, plan_tier")
     .eq("profile_id", user.id)
     .single();
-  return business?.id ?? null;
+  return business ?? null;
 }
 
 export async function disconnectMercadoPagoAction(): Promise<ActionResult> {
-  const businessId = await getOwnBusinessId();
-  if (!businessId) {
+  const business = await getOwnBusiness();
+  if (!business) {
     return { ok: false, error: "Sua sessão expirou. Recarregue a página e tente novamente." };
   }
+  const businessId = business.id;
 
   const admin = createAdminClient();
   await admin.from("mp_connections").delete().eq("business_id", businessId);
@@ -37,13 +40,18 @@ export async function updateEntradaSettingsAction(input: {
   ativa: boolean;
   percentual: number;
 }): Promise<ActionResult> {
-  const businessId = await getOwnBusinessId();
-  if (!businessId) {
+  const business = await getOwnBusiness();
+  if (!business) {
     return { ok: false, error: "Sua sessão expirou. Recarregue a página e tente novamente." };
   }
+  const businessId = business.id;
 
   if (input.percentual < 0 || input.percentual > 100) {
     return { ok: false, error: "Percentual inválido." };
+  }
+
+  if (input.ativa && !hasFeature(business.plan_tier, "pix_automatico")) {
+    return { ok: false, error: "Pix automático é exclusivo dos planos Pro e Studio." };
   }
 
   const admin = createAdminClient();

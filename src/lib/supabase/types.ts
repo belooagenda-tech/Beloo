@@ -30,9 +30,6 @@ export type Profile = {
   email: string | null;
   avatar_url: string | null;
   is_admin: boolean;
-  // Acesso à aba Editor (layout visual) — concedido pelo admin em /app/admin.
-  // Todo admin também edita (checado em código); nem todo editor é admin.
-  is_layout_editor: boolean;
   created_at: string;
 };
 
@@ -65,10 +62,14 @@ export type Business = {
   // depois na Agenda). Irrelevante enquanto a loja não cadastra ninguém em
   // `professionals`.
   modo_selecao_profissional: ModoSelecaoProfissional;
+  // Fonte de verdade de quais features o negócio tem — ver src/lib/plan/features.ts.
+  plan_tier: PlanTier;
   created_at: string;
 };
 
 export type ModoSelecaoProfissional = "cliente_escolhe" | "automatico";
+
+export type PlanTier = "gratis" | "pro" | "studio";
 
 // Membro de equipe cadastrado pelo dono da loja — sem login próprio (ver
 // supabase/migrations/20260819000001_professionals.sql). Uma loja sem
@@ -385,9 +386,9 @@ export type SaasPlan = {
   nome: string;
   status: string;
   valor_mensal: number;
+  valor_mensal_pro: number;
+  valor_mensal_studio: number;
   trial_dias: number;
-  billing_enabled: boolean;
-  billing_enabled_at: string | null;
   updated_at: string;
 };
 
@@ -523,20 +524,6 @@ export type MetaAdsEventLog = {
   created_at: string;
 };
 
-// Rascunho/publicação de uma "página editável" do Editor Visual (ver
-// src/lib/layout-editor/pages.ts para as chaves válidas de page_key e o
-// formato de draft_content/published_content de cada uma).
-export type LayoutDraft = {
-  id: string;
-  page_key: string;
-  draft_content: Record<string, unknown>;
-  published_content: Record<string, unknown>;
-  updated_by: string | null;
-  updated_at: string;
-  published_by: string | null;
-  published_at: string | null;
-};
-
 type Table<Row> = {
   Row: Row;
   Insert: Partial<Row>;
@@ -586,7 +573,6 @@ export type Database = {
       support_messages: Table<SupportMessage>;
       meta_ads_settings: Table<MetaAdsSettings>;
       meta_ads_events_log: Table<MetaAdsEventLog>;
-      layout_drafts: Table<LayoutDraft>;
     };
     Views: Record<string, never>;
     Functions: {

@@ -12,13 +12,11 @@ export function AppShell({
   nomeLoja,
   notifications,
   isAdmin = false,
-  isLayoutEditor = false,
   children,
 }: {
   nomeLoja: string;
   notifications: Notification[];
   isAdmin?: boolean;
-  isLayoutEditor?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -38,12 +36,12 @@ export function AppShell({
       <InstallPrompt />
       <div className="flex flex-1 flex-col md:flex-row">
         <div className="print:hidden">
-          <AppSidebarNav isAdmin={isAdmin} isLayoutEditor={isLayoutEditor} />
+          <AppSidebarNav isAdmin={isAdmin} />
         </div>
         <main className="flex-1 px-4 py-6 pb-20 sm:px-6 md:pb-6 print:p-0">{children}</main>
       </div>
       <div className="print:hidden">
-        <MobileBottomNav isAdmin={isAdmin} isLayoutEditor={isLayoutEditor} />
+        <MobileBottomNav isAdmin={isAdmin} />
       </div>
     </div>
   );

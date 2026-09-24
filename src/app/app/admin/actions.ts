@@ -1,9 +1,8 @@
 "use server";
 
-import { fromZonedTime } from "date-fns-tz";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOwnProfile } from "@/lib/supabase/session";
-import type { SaasSubscriptionStatus } from "@/lib/supabase/types";
+import type { PlanTier } from "@/lib/supabase/types";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -13,43 +12,23 @@ async function requireAdmin() {
   return profile;
 }
 
-// Mesmo fuso usado no relatório de comissões do Admin (ver page.tsx) — as
-// datas escolhidas aqui são só "dia", então fecham às 23:59:59 desse fuso
-// pra "até dia X" incluir o dia X inteiro.
-const ADMIN_TIMEZONE = "America/Sao_Paulo";
-
-function endOfDayInAdminTz(dateStr: string): string {
-  return fromZonedTime(`${dateStr}T23:59:59`, ADMIN_TIMEZONE).toISOString();
-}
-
-// Controle manual do vencimento de um profissional pelo Admin — prolongar um
-// trial, marcar como ativo com uma data de próxima cobrança combinada fora
-// do fluxo normal do Mercado Pago, etc. O sistema (bloqueio de acesso em
-// app/(gated)/layout.tsx) lê status/trial_ends_at/current_period_end direto
-// dessa tabela, então qualquer alteração aqui já vale na hora.
-export async function updateSubscriptionAction(input: {
+// Ajuste manual do plano de um negócio pelo Admin — ex. comp de cortesia,
+// suporte a um caso específico. Grava direto em businesses.plan_tier, a
+// mesma coluna que o webhook do Stripe escreve quando alguém assina/cancela.
+export async function updateBusinessPlanTierAction(input: {
   businessId: string;
-  status: SaasSubscriptionStatus;
-  trialEndsAt: string;
-  currentPeriodEnd: string | null;
+  planTier: PlanTier;
 }): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (!admin) {
     return { ok: false, error: "Sem permissão." };
   }
-  if (!input.trialEndsAt) {
-    return { ok: false, error: "Informe a data do trial." };
-  }
 
   const supabase = createAdminClient();
   const { error } = await supabase
-    .from("saas_subscriptions")
-    .update({
-      status: input.status,
-      trial_ends_at: endOfDayInAdminTz(input.trialEndsAt),
-      current_period_end: input.currentPeriodEnd ? endOfDayInAdminTz(input.currentPeriodEnd) : null,
-    })
-    .eq("business_id", input.businessId);
+    .from("businesses")
+    .update({ plan_tier: input.planTier })
+    .eq("id", input.businessId);
 
   if (error) {
     return { ok: false, error: "Não foi possível salvar. Tente novamente." };
@@ -57,54 +36,32 @@ export async function updateSubscriptionAction(input: {
   return { ok: true };
 }
 
-export async function toggleBillingAction(input: {
-  enabled: boolean;
-  valorMensal: number;
+export async function updatePlanPricesAction(input: {
+  valorPro: number;
+  valorStudio: number;
 }): Promise<ActionResult> {
   const admin = await requireAdmin();
   if (!admin) {
     return { ok: false, error: "Sem permissão." };
   }
-  if (input.valorMensal <= 0) {
-    return { ok: false, error: "Informe um preço válido." };
+  if (input.valorPro <= 0 || input.valorStudio <= 0) {
+    return { ok: false, error: "Informe preços válidos." };
   }
 
   const supabase = createAdminClient();
 
-  const { data: current } = await supabase
-    .from("saas_plans")
-    .select("id, billing_enabled, trial_dias")
-    .limit(1)
-    .maybeSingle();
+  const { data: current } = await supabase.from("saas_plans").select("id").limit(1).maybeSingle();
   if (!current) {
-    return { ok: false, error: "Configuração de cobrança não encontrada." };
+    return { ok: false, error: "Configuração de planos não encontrada." };
   }
-
-  const ligandoAgora = input.enabled && !current.billing_enabled;
 
   const { error } = await supabase
     .from("saas_plans")
-    .update({
-      billing_enabled: input.enabled,
-      valor_mensal: input.valorMensal,
-      ...(ligandoAgora ? { billing_enabled_at: new Date().toISOString() } : {}),
-    })
+    .update({ valor_mensal_pro: input.valorPro, valor_mensal_studio: input.valorStudio })
     .eq("id", current.id);
 
   if (error) {
     return { ok: false, error: "Não foi possível salvar. Tente novamente." };
-  }
-
-  // Dá 7 dias grátis (a partir de agora) para quem ainda está em trial — é
-  // assim que quem já usa a Beloo hoje ganha tempo pra pagar antes de ser
-  // bloqueado.
-  if (ligandoAgora) {
-    await supabase
-      .from("saas_subscriptions")
-      .update({
-        trial_ends_at: new Date(Date.now() + current.trial_dias * 24 * 60 * 60 * 1000).toISOString(),
-      })
-      .eq("status", "trial");
   }
 
   return { ok: true };
@@ -153,62 +110,6 @@ export async function toggleDivulgadorStatusAction(input: {
     .from("divulgadores")
     .update({ status: input.status })
     .eq("id", input.divulgadorId);
-
-  if (error) {
-    return { ok: false, error: "Não foi possível salvar. Tente novamente." };
-  }
-  return { ok: true };
-}
-
-// ============================================================================
-// Editor Visual — quem tem acesso à aba /app/editor. Ver
-// supabase/migrations/20260916000001_layout_editor.sql e
-// src/app/app/editor/actions.ts (onde o rascunho/publicação em si vivem).
-// ============================================================================
-
-export type LayoutEditorProfile = { id: string; nome: string; email: string | null };
-
-export async function searchProfilesByEmailAction(
-  query: string,
-): Promise<{ ok: true; profiles: LayoutEditorProfile[] } | { ok: false; error: string }> {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return { ok: false, error: "Sem permissão." };
-  }
-
-  const trimmed = query.trim();
-  if (trimmed.length < 3) {
-    return { ok: false, error: "Digite pelo menos 3 letras do e-mail." };
-  }
-
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, nome, email")
-    .ilike("email", `%${trimmed}%`)
-    .order("nome", { ascending: true })
-    .limit(10);
-
-  if (error) {
-    return { ok: false, error: "Não foi possível buscar. Tente novamente." };
-  }
-  return { ok: true, profiles: data ?? [] };
-}
-
-export async function setLayoutEditorAction(input: {
-  profileId: string;
-  isLayoutEditor: boolean;
-}): Promise<ActionResult> {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return { ok: false, error: "Sem permissão." };
-  }
-
-  const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("profiles")
-    .update({ is_layout_editor: input.isLayoutEditor })
-    .eq("id", input.profileId);
 
   if (error) {
     return { ok: false, error: "Não foi possível salvar. Tente novamente." };

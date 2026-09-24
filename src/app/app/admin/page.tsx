@@ -5,12 +5,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOwnProfile } from "@/lib/supabase/session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BillingSettingsCard } from "./billing-settings-card";
+import { PlanPricesCard } from "./plan-prices-card";
 import { ProfessionalsTable } from "./professionals-table";
 import { DivulgadoresCard, type DivulgadorRow } from "./divulgadores-card";
 import { IndicacoesCard, type IndicacaoRow } from "./indicacoes-card";
 import { ComissoesCard, type ComissaoRow } from "./comissoes-card";
-import { LayoutEditorsCard } from "./layout-editors-card";
 import { normalizarPeriodo, resolvePeriodo } from "../(gated)/financeiro/period";
 
 // Fuso fixo pro filtro de período do extrato de comissões — é um relatório
@@ -36,7 +35,7 @@ export default async function AdminPage({
 
   const { data: plan } = await admin
     .from("saas_plans")
-    .select("billing_enabled, valor_mensal, billing_enabled_at, trial_dias")
+    .select("valor_mensal_pro, valor_mensal_studio")
     .limit(1)
     .maybeSingle();
 
@@ -48,16 +47,11 @@ export default async function AdminPage({
   const inicio = (pagina - 1) * PROFISSIONAIS_PAGE_SIZE;
   const fim = inicio + PROFISSIONAIS_PAGE_SIZE - 1;
 
-  const [{ data: businesses, count: totalBusinesses }, { data: subscriptions }] = await Promise.all([
-    admin
-      .from("businesses")
-      .select("id, nome_loja, slug, profile_id", { count: "exact" })
-      .order("nome_loja", { ascending: true })
-      .range(inicio, fim),
-    admin
-      .from("saas_subscriptions")
-      .select("business_id, status, trial_ends_at, current_period_end"),
-  ]);
+  const { data: businesses, count: totalBusinesses } = await admin
+    .from("businesses")
+    .select("id, nome_loja, slug, profile_id, plan_tier", { count: "exact" })
+    .order("nome_loja", { ascending: true })
+    .range(inicio, fim);
 
   const totalPaginas = Math.max(1, Math.ceil((totalBusinesses ?? 0) / PROFISSIONAIS_PAGE_SIZE));
 
@@ -69,7 +63,6 @@ export default async function AdminPage({
 
   const emailById = new Map((profiles ?? []).map((p) => [p.id, p.email]));
   const telefoneById = new Map((profiles ?? []).map((p) => [p.id, p.telefone]));
-  const subByBusinessId = new Map((subscriptions ?? []).map((s) => [s.business_id, s]));
 
   // Status de uso — decide qual mensagem de WhatsApp oferecer (ver
   // buildOutreachMessage em src/lib/whatsapp.ts): sem nenhum serviço
@@ -97,7 +90,6 @@ export default async function AdminPage({
   );
 
   const linhas = (businesses ?? []).map((business) => {
-    const sub = subByBusinessId.get(business.id);
     const statusUso: "sem_configuracao" | "configurado_sem_uso" | "ativo" = businessesComAgendamento.has(
       business.id,
     )
@@ -112,9 +104,7 @@ export default async function AdminPage({
       email: emailById.get(business.profile_id) ?? "—",
       telefone: telefoneById.get(business.profile_id) ?? null,
       statusUso,
-      status: sub?.status ?? "trial",
-      trialEndsAt: sub?.trial_ends_at ?? null,
-      currentPeriodEnd: sub?.current_period_end ?? null,
+      planTier: business.plan_tier,
     };
   });
 
@@ -203,12 +193,6 @@ export default async function AdminPage({
     .select("id", { count: "exact", head: true })
     .eq("lida", false);
 
-  const { data: layoutEditors } = await admin
-    .from("profiles")
-    .select("id, nome, email")
-    .eq("is_layout_editor", true)
-    .order("nome", { ascending: true });
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -250,11 +234,9 @@ export default async function AdminPage({
         </div>
       </div>
 
-      <BillingSettingsCard
-        initialEnabled={plan?.billing_enabled ?? false}
-        initialValorMensal={plan?.valor_mensal ?? 49.9}
-        billingEnabledAt={plan?.billing_enabled_at ?? null}
-        trialDias={plan?.trial_dias ?? 7}
+      <PlanPricesCard
+        initialValorPro={plan?.valor_mensal_pro ?? 49.9}
+        initialValorStudio={plan?.valor_mensal_studio ?? 89.9}
       />
 
       <Card>
@@ -292,8 +274,6 @@ export default async function AdminPage({
           ) : null}
         </CardContent>
       </Card>
-
-      <LayoutEditorsCard initialEditors={layoutEditors ?? []} />
 
       <DivulgadoresCard divulgadores={divulgadores} cadastroUrl={`${siteUrl}/divulgador/cadastro`} />
       <IndicacoesCard indicacoes={indicacoes} />

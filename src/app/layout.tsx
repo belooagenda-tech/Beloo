@@ -1,11 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins, Inter, Manrope, Sora, DM_Sans } from "next/font/google";
+import { Poppins, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
 import { MetaPixel } from "@/components/meta-pixel/meta-pixel";
 import { getMetaAdsSettings } from "@/lib/meta-ads/settings";
-import { ThemeStyleInjector } from "@/components/theme/theme-style-injector";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -16,24 +15,6 @@ const poppins = Poppins({
 
 const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-// Lista curada de fontes que o Editor Visual pode escolher (ver
-// src/lib/layout-editor/theme-schema.ts) — pré-carregadas no build via
-// next/font, nunca em runtime.
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-});
-
-const sora = Sora({
-  variable: "--font-sora",
-  subsets: ["latin"],
-});
-
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
   subsets: ["latin"],
 });
 
@@ -103,7 +84,7 @@ export default async function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${poppins.variable} ${inter.variable} ${manrope.variable} ${sora.variable} ${dmSans.variable} h-full antialiased`}
+      className={`${poppins.variable} ${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
@@ -115,7 +96,6 @@ export default async function RootLayout({
             media={`(device-width: ${s.dw}px) and (device-height: ${s.dh}px) and (-webkit-device-pixel-ratio: ${s.dpr}) and (orientation: portrait)`}
           />
         ))}
-        <ThemeStyleInjector />
       </head>
       <body className="min-h-full flex flex-col">
         <MetaPixel pixelId={trackingEnabled ? pixelId : null} />

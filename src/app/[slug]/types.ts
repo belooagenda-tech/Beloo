@@ -1,3 +1,5 @@
+import type { PlanTier } from "@/lib/supabase/types";
+
 export type PublicBusiness = {
   id: string;
   nome_loja: string;
@@ -8,6 +10,7 @@ export type PublicBusiness = {
   entrada_ativa: boolean;
   entrada_percentual: number;
   modo_selecao_profissional: "cliente_escolhe" | "automatico";
+  plan_tier: PlanTier;
 };
 
 export type PublicService = {

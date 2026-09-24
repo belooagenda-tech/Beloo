@@ -3,19 +3,31 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOwnBusiness } from "@/lib/supabase/session";
 import { PlansManager } from "./plans-manager";
-import { CustomBlocks } from "@/components/theme/custom-blocks";
+import { ProFeatureGate } from "@/components/plan/pro-feature-gate";
+import { hasFeature } from "@/lib/plan/features";
 
 export const metadata: Metadata = { title: "Planos" };
 
-export default async function PlanosPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ editorPreview?: string }>;
-}) {
-  const { editorPreview } = await searchParams;
-  const preview = editorPreview === "1";
+export default async function PlanosPage() {
   const supabase = await createClient();
   const business = await getOwnBusiness();
+
+  if (!hasFeature(business!.plan_tier, "planos_recorrentes")) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold text-foreground">Planos</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Pacotes recorrentes que você vende para os seus clientes.
+          </p>
+        </div>
+        <ProFeatureGate
+          feature="planos_recorrentes"
+          description="Venda pacotes recorrentes pros seus clientes fiéis e deixe a Beloo controlar os créditos usados automaticamente."
+        />
+      </div>
+    );
+  }
 
   const admin = createAdminClient();
   const [{ data: services }, { data: plans }, { data: mpConnection }] = await Promise.all([
@@ -35,7 +47,6 @@ export default async function PlanosPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-planos" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">Planos</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -51,7 +62,6 @@ export default async function PlanosPage({
         initialPlans={plans ?? []}
         mpConnected={Boolean(mpConnection)}
       />
-      <CustomBlocks pageKey="app-planos" position="after" preview={preview} />
     </div>
   );
 }

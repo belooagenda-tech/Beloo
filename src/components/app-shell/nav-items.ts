@@ -14,7 +14,6 @@ import {
   Sparkles,
   LifeBuoy,
   ShieldCheck,
-  Paintbrush,
 } from "lucide-react";
 
 export interface NavItem {
@@ -41,15 +40,8 @@ export const NAV_ITEMS: NavItem[] = [
 
 export const ADMIN_NAV_ITEM: NavItem = { href: "/app/admin", label: "Admin", icon: ShieldCheck };
 
-// Só aparece pra quem tem profiles.is_layout_editor (ou é admin — todo admin
-// também edita). Ver supabase/migrations/20260916000001_layout_editor.sql.
-export const EDITOR_NAV_ITEM: NavItem = { href: "/app/editor", label: "Editor", icon: Paintbrush };
-
-export function getNavItems(isAdmin: boolean, isLayoutEditor = false): NavItem[] {
-  const items = [...NAV_ITEMS];
-  if (isAdmin || isLayoutEditor) items.push(EDITOR_NAV_ITEM);
-  if (isAdmin) items.push(ADMIN_NAV_ITEM);
-  return items;
+export function getNavItems(isAdmin: boolean): NavItem[] {
+  return isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 }
 
 // No celular, a barra inferior só tem espaço pra poucos atalhos — os mais
@@ -64,9 +56,6 @@ const SECONDARY_MOBILE_NAV_ITEMS = NAV_ITEMS.filter(
   (item) => !PRIMARY_MOBILE_HREFS.includes(item.href),
 );
 
-export function getSecondaryMobileNavItems(isAdmin: boolean, isLayoutEditor = false): NavItem[] {
-  const items = [...SECONDARY_MOBILE_NAV_ITEMS];
-  if (isAdmin || isLayoutEditor) items.push(EDITOR_NAV_ITEM);
-  if (isAdmin) items.push(ADMIN_NAV_ITEM);
-  return items;
+export function getSecondaryMobileNavItems(isAdmin: boolean): NavItem[] {
+  return isAdmin ? [...SECONDARY_MOBILE_NAV_ITEMS, ADMIN_NAV_ITEM] : SECONDARY_MOBILE_NAV_ITEMS;
 }

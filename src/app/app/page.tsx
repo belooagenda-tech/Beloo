@@ -8,20 +8,15 @@ import { getOwnBusiness, getOwnProfile } from "@/lib/supabase/session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { CopyLinkButton } from "@/components/app-shell/copy-link-button";
-import { CustomBlocks } from "@/components/theme/custom-blocks";
+import { ProFeatureGate } from "@/components/plan/pro-feature-gate";
+import { hasFeature } from "@/lib/plan/features";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Painel",
 };
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ editorPreview?: string }>;
-}) {
-  const { editorPreview } = await searchParams;
-  const preview = editorPreview === "1";
+export default async function DashboardPage() {
   const supabase = await createClient();
   const [profile, business] = await Promise.all([getOwnProfile(), getOwnBusiness()]);
 
@@ -89,7 +84,6 @@ export default async function DashboardPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <CustomBlocks pageKey="app-painel" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">
           Olá{primeiroNome ? `, ${primeiroNome}` : ""} 👋
@@ -150,7 +144,12 @@ export default async function DashboardPage({
         <StatCard label="Clientes" value={clientesCount ?? 0} href="/app/clientes" />
       </div>
 
-      {notaMedia !== null ? (
+      {!hasFeature(business!.plan_tier, "avaliacoes") ? (
+        <ProFeatureGate
+          feature="avaliacoes"
+          description="Veja a nota média e os comentários dos seus clientes direto no Painel."
+        />
+      ) : notaMedia !== null ? (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <CardTitle className="text-base">Avaliações</CardTitle>
@@ -208,7 +207,6 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       ) : null}
-      <CustomBlocks pageKey="app-painel" position="after" preview={preview} />
     </div>
   );
 }

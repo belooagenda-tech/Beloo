@@ -27,7 +27,8 @@ const RevenueByProfessionalChart = dynamic(() =>
   import("./charts/revenue-by-professional-chart").then((mod) => mod.RevenueByProfessionalChart),
 );
 import { Card, CardContent } from "@/components/ui/card";
-import { CustomBlocks } from "@/components/theme/custom-blocks";
+import { ProFeatureGate } from "@/components/plan/pro-feature-gate";
+import { hasFeature } from "@/lib/plan/features";
 import type { ExpiringPlan, FinancePayment } from "./types";
 
 export const metadata: Metadata = { title: "Financeiro" };
@@ -65,17 +66,29 @@ function mesAnterior(anoMes: string): string {
 export default async function FinanceiroPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string; profissional?: string; editorPreview?: string }>;
+  searchParams: Promise<{ periodo?: string; profissional?: string }>;
 }) {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
-  const {
-    periodo: periodoParam,
-    profissional: profissionalParam,
-    editorPreview,
-  } = await searchParams;
-  const preview = editorPreview === "1";
+  if (!hasFeature(business!.plan_tier, "relatorios_financeiros")) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold text-foreground">Financeiro</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Faturamento avulso e o retorno estimado dos seus planos.
+          </p>
+        </div>
+        <ProFeatureGate
+          feature="relatorios_financeiros"
+          description="Faturamento por período, serviço, produto e forma de pagamento, com exportação em CSV e relatório pronto pra imprimir."
+        />
+      </div>
+    );
+  }
+
+  const { periodo: periodoParam, profissional: profissionalParam } = await searchParams;
   const periodo = normalizarPeriodo(periodoParam);
   const { de, ate, ateStr } = resolvePeriodo(periodo, business!.timezone);
 
@@ -209,7 +222,6 @@ export default async function FinanceiroPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <CustomBlocks pageKey="app-financeiro" position="before" preview={preview} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-foreground">Financeiro</h1>
@@ -287,7 +299,6 @@ export default async function FinanceiroPage({
       <RevenueByPaymentMethodChart data={byFormaPagamento} />
       {professionals && professionals.length > 0 ? <RevenueByProfessionalChart data={byProfissional} /> : null}
       <ExpiringPlans plans={expiringPlans} nomeLoja={business!.nome_loja} />
-      <CustomBlocks pageKey="app-financeiro" position="after" preview={preview} />
     </div>
   );
 }

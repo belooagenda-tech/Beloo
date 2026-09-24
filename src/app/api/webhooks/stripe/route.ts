@@ -157,29 +157,37 @@ async function handleInvoicePaymentSucceeded(admin: Admin, invoice: Stripe.Invoi
 
   const subscription = await stripe().subscriptions.retrieve(subscriptionId);
   const currentPeriodEnd = subscription.items.data[0]?.current_period_end;
+  const planTier = subscription.metadata?.plan_tier;
 
-  // Atômico e separado do update "geral" logo abaixo: só dispara Subscribe
-  // quando ESTE request é quem tira a assinatura de "trial" (não uma
-  // renovação, nem uma reentrega do mesmo webhook do Stripe pra essa mesma
-  // fatura — a segunda tentativa encontra status já "ativo" e não bate
-  // nenhuma linha no `.eq("status", "trial")`).
-  const { data: activation } = await admin
+  // Sem "trial" mais (Grátis é permanente, sem essa etapa) — o que define
+  // "primeira ativação" agora é a linha ainda não existir com status "ativo"
+  // antes deste request. isFirstActivation continua existindo só pra não
+  // disparar o evento Subscribe do Meta de novo numa reentrega do mesmo
+  // webhook ou numa renovação mensal.
+  const { data: existing } = await admin
     .from("saas_subscriptions")
-    .update({ status: "ativo" })
+    .select("status")
     .eq("business_id", businessId)
-    .eq("status", "trial")
-    .select("id");
-  const isFirstActivation = (activation?.length ?? 0) > 0;
+    .maybeSingle();
+  const isFirstActivation = existing?.status !== "ativo";
 
-  await admin
-    .from("saas_subscriptions")
-    .update({
+  await admin.from("saas_subscriptions").upsert(
+    {
+      business_id: businessId,
       status: "ativo",
       current_period_end: currentPeriodEnd
         ? new Date(currentPeriodEnd * 1000).toISOString()
         : undefined,
-    })
-    .eq("business_id", businessId);
+    },
+    { onConflict: "business_id" },
+  );
+
+  // plan_tier vem dos metadados da subscription (gravado no checkout — ver
+  // src/lib/stripe/client.ts) — é o que realmente libera as features do
+  // Pro/Studio pro negócio, independente do status de pagamento em si.
+  if (planTier === "pro" || planTier === "studio") {
+    await admin.from("businesses").update({ plan_tier: planTier }).eq("id", businessId);
+  }
 
   // Além de "era trial", só conta como assinatura paga de verdade se a
   // fatura realmente cobrou algo — algumas configurações de trial no Stripe
@@ -250,6 +258,12 @@ async function handleInvoicePaymentFailed(admin: Admin, invoice: Stripe.Invoice)
     .update({ status: "atrasado" })
     .eq("business_id", resolved.businessId);
 
+  // Rebaixa pra Grátis na hora — nunca bloqueia o acesso ao /app, só volta
+  // a valer o limite de 30 agendamentos/mês e 1 profissional. Se o
+  // pagamento for recuperado depois, handleInvoicePaymentSucceeded volta a
+  // subir o tier.
+  await admin.from("businesses").update({ plan_tier: "gratis" }).eq("id", resolved.businessId);
+
   return NextResponse.json({ ok: true });
 }
 
@@ -275,6 +289,10 @@ async function handleSubscriptionDeleted(admin: Admin, subscription: Stripe.Subs
     .eq("business_id", assinatura.profissional_id)
     .neq("status", "cancelado")
     .select("id");
+
+  // Rebaixa pra Grátis (nunca bloqueia acesso — mesma decisão de
+  // handleInvoicePaymentFailed acima).
+  await admin.from("businesses").update({ plan_tier: "gratis" }).eq("id", assinatura.profissional_id);
 
   if ((updated?.length ?? 0) > 0) {
     const userData = await getMetaUserDataForBusiness(admin, assinatura.profissional_id);

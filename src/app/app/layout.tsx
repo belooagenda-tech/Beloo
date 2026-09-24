@@ -49,7 +49,6 @@ async function AppLayoutContent({ children }: { children: ReactNode }) {
       nomeLoja={business.nome_loja}
       notifications={notifications ?? []}
       isAdmin={profile?.is_admin ?? false}
-      isLayoutEditor={profile?.is_layout_editor ?? false}
     >
       {children}
     </AppShell>

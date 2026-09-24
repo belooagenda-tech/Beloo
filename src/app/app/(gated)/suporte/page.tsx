@@ -6,7 +6,6 @@ import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { SupportForm } from "./support-form";
-import { CustomBlocks } from "@/components/theme/custom-blocks";
 
 export const metadata: Metadata = { title: "Suporte" };
 
@@ -14,13 +13,7 @@ export const metadata: Metadata = { title: "Suporte" };
 // app/app/assinatura/page.tsx pro contato de suporte de cobrança.
 const WHATSAPP_BELOO = "21972652314";
 
-export default async function SuportePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ editorPreview?: string }>;
-}) {
-  const { editorPreview } = await searchParams;
-  const preview = editorPreview === "1";
+export default async function SuportePage() {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
@@ -37,7 +30,6 @@ export default async function SuportePage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-suporte" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">Suporte</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -60,7 +52,6 @@ export default async function SuportePage({
       </Card>
 
       <SupportForm initialMessages={messages ?? []} />
-      <CustomBlocks pageKey="app-suporte" position="after" preview={preview} />
     </div>
   );
 }

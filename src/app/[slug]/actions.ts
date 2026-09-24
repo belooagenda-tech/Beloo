@@ -272,6 +272,12 @@ export async function createAppointmentAction(input: {
     if (rpcError?.code === "BL009") {
       return { ok: false, error: "Esse horário acabou de ficar indisponível. Escolha outro horário ou profissional." };
     }
+    if (rpcError?.code === "BL010") {
+      return {
+        ok: false,
+        error: "Essa loja atingiu o limite de agendamentos deste mês. Fale direto com ela pra confirmar seu horário.",
+      };
+    }
     return { ok: false, error: "Não foi possível concluir o agendamento. Tente novamente." };
   }
 

@@ -10,7 +10,7 @@ export const getPublicBusiness = cache(async (slug: string) => {
   const { data: business } = await supabase
     .from("businesses")
     .select(
-      "id, nome_loja, slug, categoria, logo_url, timezone, entrada_ativa, entrada_percentual, modo_selecao_profissional",
+      "id, nome_loja, slug, categoria, logo_url, timezone, entrada_ativa, entrada_percentual, modo_selecao_profissional, plan_tier",
     )
     .eq("slug", slug)
     .maybeSingle();

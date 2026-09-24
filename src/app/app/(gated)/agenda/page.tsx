@@ -6,7 +6,8 @@ import { getOwnBusiness } from "@/lib/supabase/session";
 import { resolveDayBlocks } from "@/lib/agenda/day-window";
 import { AgendaDayView } from "./agenda-day-view";
 import { WaitlistCard, type WaitlistEntryRow } from "./waitlist-card";
-import { CustomBlocks } from "@/components/theme/custom-blocks";
+import { ProFeatureGate } from "@/components/plan/pro-feature-gate";
+import { hasFeature } from "@/lib/plan/features";
 import type { AgendaAppointment, AgendaClient, AgendaPayment, AgendaProduct } from "./types";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -35,13 +36,12 @@ type WaitlistEmbedRow = {
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ data?: string; editorPreview?: string }>;
+  searchParams: Promise<{ data?: string }>;
 }) {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
-  const { data: dataParam, editorPreview } = await searchParams;
-  const preview = editorPreview === "1";
+  const { data: dataParam } = await searchParams;
   const hojeStr = formatInTimeZone(new Date(), business!.timezone, "yyyy-MM-dd");
   const dataSelecionada = dataParam && /^\d{4}-\d{2}-\d{2}$/.test(dataParam) ? dataParam : hojeStr;
 
@@ -193,8 +193,14 @@ export default async function AgendaPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-agenda" position="before" preview={preview} />
-      <WaitlistCard nomeLoja={business!.nome_loja} initialEntries={waitlistEntries} />
+      {hasFeature(business!.plan_tier, "lista_espera") ? (
+        <WaitlistCard nomeLoja={business!.nome_loja} initialEntries={waitlistEntries} />
+      ) : (
+        <ProFeatureGate
+          feature="lista_espera"
+          description="Sua agenda lotou? O cliente entra na lista de espera sozinho, e você chama pelo WhatsApp assim que um horário abrir."
+        />
+      )}
       <AgendaDayView
         key={dataSelecionada}
         businessId={business!.id}
@@ -216,7 +222,6 @@ export default async function AgendaPage({
         professionals={professionals ?? []}
         professionalServices={professionalServices ?? []}
       />
-      <CustomBlocks pageKey="app-agenda" position="after" preview={preview} />
     </div>
   );
 }

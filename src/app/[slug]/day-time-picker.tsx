@@ -29,6 +29,7 @@ export function DayTimePicker({
   slug,
   serviceId,
   professionals,
+  waitlistEnabled = true,
 }: {
   slots: Record<string, string[]>;
   timezone: string;
@@ -44,6 +45,9 @@ export function DayTimePicker({
   // equipe vinculada) — repassado pra oferecer a mesma escolha na lista de
   // espera.
   professionals?: PublicProfessional[];
+  // Lista de espera é exclusiva do plano Pro/Studio — ver hasFeature em
+  // src/lib/plan/features.ts.
+  waitlistEnabled?: boolean;
 }) {
   const dates = Object.keys(slots).sort();
   const [manuallySelectedDate, setManuallySelectedDate] = useState<string | null>(null);
@@ -69,7 +73,7 @@ export function DayTimePicker({
           <p className="py-2 text-center text-sm text-muted-foreground">
             Nenhum horário disponível nos próximos dias.
           </p>
-          {slug && serviceId ? (
+          {slug && serviceId && waitlistEnabled ? (
             <JoinWaitlistForm slug={slug} serviceId={serviceId} professionals={professionals ?? []} />
           ) : null}
         </div>

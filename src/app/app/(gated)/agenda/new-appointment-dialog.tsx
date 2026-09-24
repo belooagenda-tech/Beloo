@@ -148,7 +148,9 @@ function NewAppointmentForm({
       setError(
         appointmentError?.code === "23P01"
           ? "Já existe um agendamento nesse horário."
-          : "Não foi possível criar o agendamento. Tente novamente.",
+          : appointmentError?.code === "BL010"
+            ? "Você atingiu o limite de 30 agendamentos/mês do plano Grátis. Faça upgrade pra Pro em Assinatura."
+            : "Não foi possível criar o agendamento. Tente novamente.",
       );
       return;
     }

@@ -72,6 +72,7 @@ export async function getAccountOnboardingStatus(accountId: string): Promise<Acc
 export type CreateSaasCheckoutInput = {
   businessId: string;
   email: string;
+  planTier: "pro" | "studio";
   valorMensal: number;
   successUrl: string;
   cancelUrl: string;
@@ -94,12 +95,14 @@ export async function createSaasCheckoutSession(
           currency: "brl",
           unit_amount: Math.round(input.valorMensal * 100),
           recurring: { interval: "month" },
-          product_data: { name: "Assinatura Beloo" },
+          product_data: { name: `Assinatura Beloo ${input.planTier === "pro" ? "Pro" : "Studio"}` },
         },
       },
     ],
     subscription_data: {
-      metadata: { business_id: input.businessId },
+      // plan_tier vai junto pro webhook saber qual tier ativar quando o
+      // pagamento for confirmado (ver src/app/api/webhooks/stripe/route.ts).
+      metadata: { business_id: input.businessId, plan_tier: input.planTier },
       ...(input.split
         ? {
             application_fee_percent: input.split.applicationFeePercent,

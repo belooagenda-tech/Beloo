@@ -14,6 +14,7 @@ import { DayTimePicker } from "./day-time-picker";
 import { ProductPicker } from "./product-picker";
 import { ClientInfoForm } from "./client-info-form";
 import { PlansSection } from "./plans-section";
+import { hasFeature } from "@/lib/plan/features";
 import type {
   PublicBusiness,
   PublicPlan,
@@ -213,6 +214,7 @@ export function PublicBookingFlow({
               slug={business.slug}
               serviceId={selectedService.id}
               professionals={eligibleProfessionals}
+              waitlistEnabled={hasFeature(business.plan_tier, "lista_espera")}
               backLabel={mostraEscolhaProfissional ? "Trocar profissional" : "Trocar serviço"}
               onBack={() => setStep(mostraEscolhaProfissional ? "profissional" : "servico")}
             />

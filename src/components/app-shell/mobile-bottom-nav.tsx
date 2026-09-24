@@ -12,15 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function MobileBottomNav({
-  isAdmin = false,
-  isLayoutEditor = false,
-}: {
-  isAdmin?: boolean;
-  isLayoutEditor?: boolean;
-}) {
+export function MobileBottomNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
-  const secondaryItems = getSecondaryMobileNavItems(isAdmin, isLayoutEditor);
+  const secondaryItems = getSecondaryMobileNavItems(isAdmin);
 
   function isActive(href: string) {
     return href === "/app" ? pathname === "/app" : pathname.startsWith(href);

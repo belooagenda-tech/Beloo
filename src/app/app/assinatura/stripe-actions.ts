@@ -23,11 +23,13 @@ async function getOwnBusinessAndProfile() {
   return { businessId: business.id, email: profile.email };
 }
 
-// Assinatura Beloo cobrada via Stripe — usada por profissionais que ainda
-// não têm nenhuma assinatura no Mercado Pago (ver branch em page.tsx). Se
-// houver uma indicação vinculada com divulgador de onboarding Stripe
-// completo, a cobrança já nasce dividida (transfer_data + application_fee).
-export async function subscribeToSaasBillingStripeAction(): Promise<ActionResult> {
+// Assinatura Beloo cobrada via Stripe — Pro ou Studio, conforme o tier
+// escolhido em /app/assinatura. Se houver uma indicação vinculada com
+// divulgador de onboarding Stripe completo, a cobrança já nasce dividida
+// (transfer_data + application_fee).
+export async function subscribeToSaasBillingStripeAction(
+  tier: "pro" | "studio",
+): Promise<ActionResult> {
   const own = await getOwnBusinessAndProfile();
   if (!own) {
     return { ok: false, error: "Sua sessão expirou. Recarregue a página e tente novamente." };
@@ -39,12 +41,13 @@ export async function subscribeToSaasBillingStripeAction(): Promise<ActionResult
   const admin = createAdminClient();
   const { data: plan } = await admin
     .from("saas_plans")
-    .select("billing_enabled, valor_mensal")
+    .select("valor_mensal_pro, valor_mensal_studio")
     .limit(1)
     .maybeSingle();
-  if (!plan || !plan.billing_enabled) {
-    return { ok: false, error: "A cobrança ainda não está ativa." };
+  if (!plan) {
+    return { ok: false, error: "Configuração de planos não encontrada." };
   }
+  const valorMensal = tier === "pro" ? plan.valor_mensal_pro : plan.valor_mensal_studio;
 
   const { data: indicacao } = await admin
     .from("indicacoes")
@@ -76,7 +79,8 @@ export async function subscribeToSaasBillingStripeAction(): Promise<ActionResult
     const { url } = await createSaasCheckoutSession({
       businessId: own.businessId,
       email: own.email,
-      valorMensal: plan.valor_mensal,
+      planTier: tier,
+      valorMensal,
       successUrl: `${siteUrl}/app/assinatura?stripe=sucesso`,
       cancelUrl: `${siteUrl}/app/assinatura`,
       split,

@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnBusiness } from "@/lib/supabase/session";
+import Link from "next/link";
 import { SelectionModeCard } from "./selection-mode-card";
 import { TeamManager } from "./team-manager";
-import { CustomBlocks } from "@/components/theme/custom-blocks";
+import { hasFeature } from "@/lib/plan/features";
 
 export const metadata: Metadata = { title: "Equipe" };
 
-export default async function EquipePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ editorPreview?: string }>;
-}) {
-  const { editorPreview } = await searchParams;
-  const preview = editorPreview === "1";
+export default async function EquipePage() {
   const supabase = await createClient();
   const business = await getOwnBusiness();
 
@@ -42,13 +37,21 @@ export default async function EquipePage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <CustomBlocks pageKey="app-equipe" position="before" preview={preview} />
       <div>
         <h1 className="font-heading text-2xl font-semibold text-foreground">Equipe</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Cadastre os profissionais que atendem na sua loja, o que cada um faz e, se
           precisar, os horários próprios de cada um.
         </p>
+        {!hasFeature(business!.plan_tier, "multi_profissional") ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Seu plano permite 1 profissional.{" "}
+            <Link href="/app/assinatura" className="text-primary hover:underline">
+              Faça upgrade pro Studio
+            </Link>{" "}
+            pra cadastrar mais de um.
+          </p>
+        ) : null}
       </div>
 
       <SelectionModeCard businessId={business!.id} initialModo={business!.modo_selecao_profissional} />
@@ -59,7 +62,6 @@ export default async function EquipePage({
         initialProfessionals={professionals ?? []}
         initialProfessionalServices={professionalServices ?? []}
       />
-      <CustomBlocks pageKey="app-equipe" position="after" preview={preview} />
     </div>
   );
 }
